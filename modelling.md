@@ -34,7 +34,7 @@ Output form:
 
 - TIME
 - VALUE
-- WORKLOAD
+- WORKLOAD`
 
 Produce a minute-based time resolution
 """
