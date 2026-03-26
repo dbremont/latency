@@ -8,7 +8,7 @@ __pycache__/
 
 data/**
 !data/
-!data/README
+!data/README.md
 
 # Distribution / packaging
 .Python
