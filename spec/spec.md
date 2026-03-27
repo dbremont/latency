@@ -127,23 +127,6 @@ $L_t = C(S_t, S_{t+1}, Z_t, E_t, W_t)$
 
 > Followingg several benchmarks in `proto/tsc` we have choosen ...
 
-## Metric Evaluation
-
-- **Cold-Start Robustness** (Initialization Stability): The metric must produce valid and stable outputs when historical data is insufficient.
-- **Sensitivity to spikes** – if a single request is extreme, it should reflect a high deviation.
-- **Sensitivity to persistent drift** – if latency gradually increases, the metric should rise.
-- **Robustness to noise** – normal small jitter shouldn’t trigger alerts.
-- **Composability** – can be used in dashboards, smoothing, or downstream analytics.
-- **Composability** (Algebraic & Pipeline Compatibility) The metric should support:
-  - aggregation across routes (weighted or hierarchical),
-  - resampling across time resolutions,
-  - integration into downstream models (forecasting, anomaly detection).
-- **Interpretability**: The metric must map cleanly to system behavior and support actionable reasoning:
-
-  - clear baseline vs deviation semantics
-  - monotonic relationship with “system health”
-  - explainable in terms of queueing, saturation, or contention
-
 ## Representation View
 
 > How to **provide a set of analytical views** over the system’s state and dynamics that support latency characterization and diagnostic analysis?
@@ -292,6 +275,23 @@ You defined Zt​∼P(⋅∣St​,Wt​) as unobserved internal structure. You n
 ### Critique
 
 > ...
+
+### Metric Evaluation
+
+- **Cold-Start Robustness** (Initialization Stability): The metric must produce valid and stable outputs when historical data is insufficient.
+- **Sensitivity to spikes** – if a single request is extreme, it should reflect a high deviation.
+- **Sensitivity to persistent drift** – if latency gradually increases, the metric should rise.
+- **Robustness to noise** – normal small jitter shouldn’t trigger alerts.
+- **Composability** – can be used in dashboards, smoothing, or downstream analytics.
+- **Composability** (Algebraic & Pipeline Compatibility) The metric should support:
+  - aggregation across routes (weighted or hierarchical),
+  - resampling across time resolutions,
+  - integration into downstream models (forecasting, anomaly detection).
+- **Interpretability**: The metric must map cleanly to system behavior and support actionable reasoning:
+
+  - clear baseline vs deviation semantics
+  - monotonic relationship with “system health”
+  - explainable in terms of queueing, saturation, or contention
 
 ## Validation
 
