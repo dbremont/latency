@@ -16,6 +16,55 @@ We aim to construct a latency model from observational data stored in a CSV file
 - Support this time **resolutions**: 1min, 5min, 10min, 25min, 50min, 60min, 1day.
 - ...
 
+### System Model
+
+> **Note**: The system state is fully determined by its history and the environment. For implementation purposes, one may introduce an explicit state space; however, for model specification this is not required.
+
+> **Note:** A primary strategy for analyzing this system is **simulation**, via the generation of histories and their corresponding evolutions.
+
+> We define the system as: $\mathcal{M} = (\mathcal{H}, \mathcal{Z}, \mathcal{E}, \mathcal{W}, T, C, P)$:
+
+- $\mathcal{H}$: **History**  — sequences of past trajectories
+- $\mathcal{Z}$: **Latent space** — (hidden internal factors: congestion, unserved work)
+- $\mathcal{E}$: **Environment** — exogenous conditions
+- $\mathcal{W}$: **Workload space** — (intensity, concurrency, pressure)
+- $\mathbb{R}^+$: latency / cost domain
+
+**History Process**:
+
+> $H_t \in \mathcal{H}, \quad
+H_t = {(S_\tau, Z_\tau, E_\tau, W_\tau) : \tau \le t}$
+
+- $(H_t)$ is the **full system memory** (grows with time)
+
+**State Construction**:
+
+> $S_t = \phi(H_t)$:
+
+- $\phi: \mathcal{H} \rightarrow \mathcal{S}$ is the **history projection operator**
+- $S_t$ is a **lossy compression** of $H_t$ (not sufficient in general)
+
+**Dynamics:**
+
+$S_{t+1} = T(H_t, Z_t, E_t, W_t)$:
+
+- $S_t \in \mathcal{S}$
+- The state is a **sufficient statistic of all past evolution**
+
+**Latent Process:**
+
+$Z_t \sim P(,\cdot \mid S_t, W_t)$
+
+- Encodes **unobserved internal structure**
+- Evolves conditionally on system pressure and configuration
+
+**Intrinsic Cost (Latency):**
+
+$L_t = C(S_t, S_{t+1}, Z_t, E_t, W_t)$
+
+- $L_t \in \mathbb{R}^+$
+- Represents the **cost of transition under constraints**
+
 ### Metric Evaluation
 
 - **Cold-Start Robustness** (Initialization Stability): The metric must produce valid and stable outputs when historical data is insufficient.
@@ -47,6 +96,8 @@ The dataset exhibits right-censoring bias:
 This is not random missingness — it is informative censoring, since the probability of missing data increases with latency.
 
 ## Metric
+
+> TO BE CONTINUE HERE -> ...
 
 Goal: produce a system-wide aggregation across multiple series.
 
