@@ -27,6 +27,19 @@ Build some **metric** - that **capture** the latecy of the system - and routes o
 - Support this time **resolutions**: 1min, 5min, 10min, 25min, 50min, 60min, 1day.
 - ...
 
+### Data Quality Considerations
+
+The dataset exhibits right-censoring bias:
+
+- If a user cancels a request (e.g., due to excessive latency), the request is not fully observed.
+- As a result, high-latency events are systematically underrepresented.
+- The observed distribution is therefore truncated on the upper tail, leading to:
+  - Underestimation of mean and variance
+  - Distortion of tail quantiles (p95, p99)
+  - Misleading conclusions about worst-case performance
+
+This is not random missingness — it is informative censoring, since the probability of missing data increases with latency.
+
 ## Response Schema
 
 ### Route Data
@@ -96,36 +109,6 @@ $L_t = C(S_t, S_{t+1}, Z_t, E_t, W_t)$
 - $L_t \in \mathbb{R}^+$
 - Represents the **cost of transition under constraints**
 
-### Metric Evaluation
-
-- **Cold-Start Robustness** (Initialization Stability): The metric must produce valid and stable outputs when historical data is insufficient.
-- **Sensitivity to spikes** – if a single request is extreme, it should reflect a high deviation.
-- **Sensitivity to persistent drift** – if latency gradually increases, the metric should rise.
-- **Robustness to noise** – normal small jitter shouldn’t trigger alerts.
-- **Composability** – can be used in dashboards, smoothing, or downstream analytics.
-- **Composability** (Algebraic & Pipeline Compatibility) The metric should support:
-  - aggregation across routes (weighted or hierarchical),
-  - resampling across time resolutions,
-  - integration into downstream models (forecasting, anomaly detection).
-- **Interpretability**: The metric must map cleanly to system behavior and support actionable reasoning:
-
-  - clear baseline vs deviation semantics
-  - monotonic relationship with “system health”
-  - explainable in terms of queueing, saturation, or contention
-
-## Data Quality Considerations
-
-The dataset exhibits right-censoring bias:
-
-- If a user cancels a request (e.g., due to excessive latency), the request is not fully observed.
-- As a result, high-latency events are systematically underrepresented.
-- The observed distribution is therefore truncated on the upper tail, leading to:
-  - Underestimation of mean and variance
-  - Distortion of tail quantiles (p95, p99)
-  - Misleading conclusions about worst-case performance
-
-This is not random missingness — it is informative censoring, since the probability of missing data increases with latency.
-
 ## Time Resolution Recasting
 
 > How to derived  Average, P50 Average (Median), P75 Average, Variance of Log-Latency, Max Value - using 1min  - data (statistics) resolution?
@@ -143,6 +126,23 @@ This is not random missingness — it is informative censoring, since the probab
 ### Strategy
 
 > Followingg several benchmarks in `proto/tsc` we have choosen ...
+
+## Metric Evaluation
+
+- **Cold-Start Robustness** (Initialization Stability): The metric must produce valid and stable outputs when historical data is insufficient.
+- **Sensitivity to spikes** – if a single request is extreme, it should reflect a high deviation.
+- **Sensitivity to persistent drift** – if latency gradually increases, the metric should rise.
+- **Robustness to noise** – normal small jitter shouldn’t trigger alerts.
+- **Composability** – can be used in dashboards, smoothing, or downstream analytics.
+- **Composability** (Algebraic & Pipeline Compatibility) The metric should support:
+  - aggregation across routes (weighted or hierarchical),
+  - resampling across time resolutions,
+  - integration into downstream models (forecasting, anomaly detection).
+- **Interpretability**: The metric must map cleanly to system behavior and support actionable reasoning:
+
+  - clear baseline vs deviation semantics
+  - monotonic relationship with “system health”
+  - explainable in terms of queueing, saturation, or contention
 
 ## Representation View
 
