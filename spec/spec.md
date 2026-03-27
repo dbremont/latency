@@ -19,14 +19,35 @@ We aim to construct a latency model from observational data stored in a CSV file
 
 Build some **metric** - that **capture** the latecy of the system - and routes over time, with the form:
 
-- **TIME** — aggregation timestamp (aligned to resolution)
+- Data Format
+  - **TIME** — aggregation timestamp (aligned to resolution)
   - **VALUE** — metric computation.
   - **WORKLOAD** — request volume (count) within the interval
 - Support **explanation** (that connection of the latency data - or deriveed data) with the underlying system ontology.
 - Support this time **resolutions**: 1min, 5min, 10min, 25min, 50min, 60min, 1day.
 - ...
 
-### System Model
+## Response Schema
+
+### Route Data
+
+- TIME: Timestamp of the window (e.g., 1min, 5min, 10min, etc.)
+- ROUTE: Route of the request.
+- OBSERVED: Dictionary with computed statistics (avg, p50, p75, var_log, max, p95, count)
+- EXPECTED: Dictionary with computed historical statistics (p50, p75, var_log)
+- DEVIATION: Normalized  OBSERVED - avg - EXPECTED.p50)
+
+### System Wide Data
+
+- TIME: Timestamp of the window (e.g., 1min, 5min, 10min, etc.)
+- VALUE: System-wide aggregated deviation value
+- WORKLOAD: Total workload for the time window
+
+## Expected-Reference Data Computation
+
+- ...
+
+## System Model
 
 > **Note**: The system state is fully determined by its history and the environment. For implementation purposes, one may introduce an explicit state space; however, for model specification this is not required.
 
@@ -105,6 +126,24 @@ The dataset exhibits right-censoring bias:
 
 This is not random missingness — it is informative censoring, since the probability of missing data increases with latency.
 
+## Time Resolution Recasting
+
+> How to derived  Average, P50 Average (Median), P75 Average, Variance of Log-Latency, Max Value - using 1min  - data (statistics) resolution?
+
+> How to **check the correcteness** of the derivered **metrics**?
+
+> How can we ensure that, for example, the P95 latency over one hour matches the P95 derived from the aggregation of 1‑minute buckets?
+
+### Evaluation Criteria
+
+- Compression ratio: the size of the compressed representation compared to the original data.
+- Consistency: It's the P95 latency from the orignial data - equal to the P95 latency from the reconstructed data.
+- Computational efficiency: the time it takes to compress and decompress the data, as well as the time it takes to compute statistics
+
+### Strategy
+
+> Followingg several benchmarks in `proto/tsc` we have choosen ...
+
 ## Representation View
 
 > How to **provide a set of analytical views** over the system’s state and dynamics that support latency characterization and diagnostic analysis?
@@ -129,13 +168,14 @@ Categories:
 | Computational Efficiency | Suitability for high-frequency, multi-route measurements without excessive resource consumption.                                                                                        |
 | Sensitivity              | Ability to capture small but meaningful changes in latency dynamics, detecting deviations from baseline.                                                                                |
 
+
 #### Metrics
 
 | **Metric**                              | **Description**                                                                             | **Evaluation**                                                                                                                            |
 | --------------------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | Average                                 | Arithmetic mean of all latency measurements in the interval.                                | Robustness: Low (sensitive to outliers) <br> Interpretability: High <br> Computational Efficiency: High <br> Sensitivity: Medium          |
 | P50 Average (Median)                    | 50th percentile latency, central value of the distribution.                                 | Robustness: Medium (resistant to outliers) <br> Interpretability: High <br> Computational Efficiency: High <br> Sensitivity: Medium       |
-| P75 Average                             | 75th percentile latency, captures moderate tail behavior.                                   | Robustness: Medium-High (captures moderate tail) <br> Interpretability: High <br> Computational Efficiency: High <br> Sensitivity: Medium |
+| P95 Average                             | 95th percentile latency, captures moderate tail behavior.                                   | Robustness: Medium-High (captures moderate tail) <br> Interpretability: High <br> Computational Efficiency: High <br> Sensitivity: Medium |
 | Spread Measure: Variance of Log-Latency | Measures variability in log-transformed latencies, highlighting multiplicative differences. | Robustness: High (captures tail spread) <br> Interpretability: Medium <br> Computational Efficiency: Medium <br> Sensitivity: High        |
 | Max Value                               | Maximum observed latency in the interval.                                                   | Ro                                                                                                                                        |
 
