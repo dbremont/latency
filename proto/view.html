@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>System Performance Model Tool</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --bg-card: #ffffff;
+      --fg: #0f172a;
+      --fg-secondary: #475569;
+      --fg-muted: #94a3b8;
+      --accent: #0891b2;
+      --accent-light: #ecfeff;
+      --warning: #f59e0b;
+      --warning-light: #fef3c7;
+      --danger: #dc2626;
+      --danger-light: #fee2e2;
+      --success: #059669;
+      --success-light: #d1fae5;
+      --border: #e2e8f0;
+      --border-dark: #cbd5e1;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      font-family: 'IBM Plex Sans', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.5;
+    }
+
+    .font-mono { font-family: 'IBM Plex Mono', monospace; }
+
+    /* Cards */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    /* Tabs */
+    .nav-tab {
+      padding: 10px 18px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--fg-secondary);
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .nav-tab:hover {
+      color: var(--fg);
+      background: var(--bg);
+    }
+
+    .nav-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .nav-tab:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--fg-secondary);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn:hover {
+      background: var(--bg);
+      border-color: var(--border-dark);
+    }
+
+    .btn.active {
+      background: var(--accent-light);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Chips */
+    .chip {
+      display: inline-flex;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-family: 'IBM Plex Mono', monospace;
+      border-radius: 4px;
+      background: var(--bg);
+      color: var(--fg-muted);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .chip:hover { color: var(--fg-secondary); }
+
+    .chip.active {
+      background: var(--accent-light);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    /* Metric cards */
+    .metric-value {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 28px;
+      font-weight: 600;
+      line-height: 1.1;
+    }
+
+    .metric-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--fg-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    /* Chart placeholder */
+    .chart-placeholder {
+      position: relative;
+      width: 100%;
+      min-height: 280px;
+      background: linear-gradient(180deg, var(--bg) 0%, var(--bg-card) 100%);
+      border: 1px dashed var(--border-dark);
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+
+    .chart-placeholder-icon {
+      width: 48px;
+      height: 48px;
+      color: var(--fg-muted);
+      opacity: 0.6;
+    }
+
+    /* Table */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .data-table th {
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--fg-muted);
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .data-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .data-table tr:hover td {
+      background: var(--bg);
+    }
+
+    /* View panels */
+    .view-panel { display: none; }
+    .view-panel.active { display: block; }
+
+    /* Matrix grid */
+    .matrix-grid {
+      display: grid;
+      gap: 4px;
+    }
+
+    .matrix-cell {
+      aspect-ratio: 1;
+      border-radius: 4px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-family: 'IBM Plex Mono', monospace;
+      color: var(--fg-muted);
+      transition: all 0.15s ease;
+    }
+
+    .matrix-cell:hover {
+      border-color: var(--accent);
+      background: var(--accent-light);
+    }
+
+    /* Animations */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .animate-in {
+      animation: fadeIn 0.4s ease-out forwards;
+      opacity: 0;
+    }
+
+    .stagger-1 { animation-delay: 0.05s; }
+    .stagger-2 { animation-delay: 0.1s; }
+    .stagger-3 { animation-delay: 0.15s; }
+    .stagger-4 { animation-delay: 0.2s; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .animate-in { animation: none; opacity: 1; }
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border-dark); border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="bg-white border-b border-[var(--border)] sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-lg bg-[var(--accent)] flex items-center justify-center">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-lg font-semibold">System Performance Model</h1>
+            <p class="text-xs text-[var(--fg-muted)] font-mono">Latency Analysis Framework</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-[var(--success-light)] border border-[var(--success)]">
+            <span class="w-2 h-2 rounded-full bg-[var(--success)]"></span>
+            <span class="text-xs font-medium text-[var(--success)]">Ready</span>
+          </div>
+          <select id="resolutionSelect" class="btn font-mono text-xs" aria-label="Time resolution">
+            <option value="1min">1 min</option>
+            <option value="5min">5 min</option>
+            <option value="10min">10 min</option>
+            <option value="25min" selected>25 min</option>
+            <option value="50min">50 min</option>
+            <option value="60min">60 min</option>
+            <option value="1day">1 day</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navigation -->
+  <nav class="bg-white border-b border-[var(--border)] overflow-x-auto" aria-label="Main navigation">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6">
+      <div class="flex">
+        <button class="nav-tab active" data-view="latency">Latency</button>
+        <button class="nav-tab" data-view="distribution">Distribution</button>
+        <button class="nav-tab" data-view="workload">Workload</button>
+        <button class="nav-tab" data-view="decomposition">Decomposition</button>
+        <button class="nav-tab" data-view="matrix">Latent Matrix</button>
+        <button class="nav-tab" data-view="elasticity">Elasticity</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+    
+    <!-- LATENCY VIEW -->
+    <div id="view-latency" class="view-panel active">
+      <!-- Metrics -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="card p-4 animate-in stagger-1">
+          <p class="metric-label">System P50</p>
+          <p class="metric-value text-[var(--fg)] mt-2">--</p>
+          <p class="text-xs text-[var(--fg-muted)] mt-1 font-mono">milliseconds</p>
+          <div class="mt-3 flex items-center gap-1 text-xs font-mono text-[var(--success)]">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+            </svg>
+            --% vs baseline
+          </div>
+        </div>
+
+        <div class="card p-4 animate-in stagger-2">
+          <p class="metric-label">System P95</p>
+          <p class="metric-value text-[var(--warning)] mt-2">--</p>
+          <p class="text-xs text-[var(--fg-muted)] mt-1 font-mono">milliseconds</p>
+          <div class="mt-3 flex items-center gap-1 text-xs font-mono text-[var(--danger)]">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
+            </svg>
+            --% vs baseline
+          </div>
+        </div>
+
+        <div class="card p-4 animate-in stagger-3">
+          <p class="metric-label">System P99</p>
+          <p class="metric-value text-[var(--danger)] mt-2">--</p>
+          <p class="text-xs text-[var(--fg-muted)] mt-1 font-mono">milliseconds</p>
+          <div class="mt-3 flex items-center gap-1 text-xs font-mono text-[var(--danger)]">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
+            </svg>
+            --% vs baseline
+          </div>
+        </div>
+
+        <div class="card p-4 animate-in stagger-4">
+          <p class="metric-label">Request Volume</p>
+          <p class="metric-value text-[var(--accent)] mt-2">--</p>
+          <p class="text-xs text-[var(--fg-muted)] mt-1 font-mono">requests/interval</p>
+          <div class="mt-3 flex items-center gap-1 text-xs font-mono text-[var(--success)]">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+            </svg>
+            --% vs baseline
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Chart -->
+      <div class="card p-5 mb-6 animate-in stagger-3">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 class="text-base font-semibold">System Latency Over Time</h2>
+            <p class="text-sm text-[var(--fg-muted)]">Temporal evolution of latency quantiles</p>
+          </div>
+          <div class="flex gap-2">
+            <button class="chip active" data-scope="system">System</button>
+            <button class="chip" data-scope="routes">By Route</button>
+          </div>
+        </div>
+        <div class="chart-placeholder">
+          <svg class="chart-placeholder-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
+          </svg>
+          <p class="text-sm text-[var(--fg-secondary)]">Load CSV data to visualize latency time series</p>
+          <p class="text-xs text-[var(--fg-muted)] font-mono">Schema: TIME, ROUTE, DURATION</p>
+        </div>
+      </div>
+
+      <!-- Secondary Charts -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="card p-5 animate-in stagger-4">
+          <h2 class="text-base font-semibold mb-1">Latency Deviation</h2>
+          <p class="text-sm text-[var(--fg-muted)] mb-4">Deviation from baseline latency over time</p>
+          <div class="chart-placeholder" style="min-height: 200px;">
+            <svg class="chart-placeholder-icon" style="width: 36px; height: 36px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+            </svg>
+            <p class="text-sm text-[var(--fg-muted)]">No data loaded</p>
+          </div>
+        </div>
+
+        <div class="card p-5 animate-in stagger-4">
+          <h2 class="text-base font-semibold mb-1">Rate of Change</h2>
+          <p class="text-sm text-[var(--fg-muted)] mb-4">First derivative: dL/dt</p>
+          <div class="chart-placeholder" style="min-height: 200px;">
+            <svg class="chart-placeholder-icon" style="width: 36px; height: 36px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"/>
+            </svg>
+            <p class="text-sm text-[var(--fg-muted)]">No data loaded</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DISTRIBUTION VIEW -->
+    <div id="view-distribution" class="view-panel">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div class="card p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-base font-semibold">System Latency Distribution</h2>
+              <p class="text-sm text-[var(--fg-muted)]">Histogram with censoring boundary</p>
+            </div>
+            <span class="px-2 py-1 text-xs font-medium bg-[var(--danger-light)] text-[var(--danger)] rounded">Censored</span>
+          </div>
+          <div class="chart-placeholder">
+            <svg class="chart-placeholder-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6z"/>
+            </svg>
+            <p class="text-sm text-[var(--fg-secondary)]">Distribution histogram</p>
+            <p class="text-xs text-[var(--fg-muted)] font-mono">Right-censoring detected</p>
+          </div>
+        </div>
+
+        <div class="card p-5">
+          <h2 class="text-base font-semibold mb-1">Route Latency Distribution</h2>
+          <p class="text-sm text-[var(--fg-muted)] mb-4">Comparative distribution across routes</p>
+          <div class="chart-placeholder">
+            <svg class="chart-placeholder-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            </svg>
+            <p class="text-sm text-[var(--fg-secondary)]">Route distributions</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-5">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-base font-semibold">Quantile Surface</h2>
+            <p class="text-sm text-[var(--fg-muted)]">Temporal quantile surface: Q(t, p)</p>
+          </div>
+          <div class="flex gap-2">
+            <button class="chip active">System</button>
+            <button class="chip">Route</button>
+          </div>
+        </div>
+        <div class="chart-placeholder" style="min-height: 300px;">
+          <svg class="chart-placeholder-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/>
+          </svg>
+          <p class="text-sm text-[var(--fg-secondary)]">Quantile surface visualization</p>
+          <p class="text-xs text-[var(--fg-muted)] font-mono">P50, P90, P95, P99 over time</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- WORKLOAD VIEW -->
+    <div id="view-workload" class="view-panel">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <div class="lg:col-span-2 card p-5">
+          <h2 class="text-base font-semibold mb-1">Workload-Latency Relationship</h2>
+          <p class="text-sm text-[var(--fg-muted)] mb-4">L = f(W): Latency as a function of workload intensity</p>
+          <div class="chart-placeholder" style="min-height: 320px;">
+            <svg class="chart-placeholder-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            <p class="text-sm text-[var(--fg-secondary)]">Workload vs Latency scatter</p>
+            <p class="text-xs text-[var(--fg-muted)] font-mono">Detect saturation points</p>
+          </div>
+        </div>
+
+        <div class="card p-5">
+          <h2 class="text-base font-semibold mb-4">Workload Components</h2>
+          <div class="space-y-4">
+            <div>
+              <div class="flex justify-between text-sm mb-2">
+                <span class="text-[var(--fg-secondary)]">Intensity</span>
+                <span class="font-mono text-[var(--accent)]">-- req/s</span>
+              </div>
+              <div class="h-2 rounded-full bg-[var(--bg)] border border-[var(--border)]">
+                <div class="h-full rounded-full bg-[var(--accent)]" style="width: 0%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between text-sm mb-2">
+                <span class="text-[var(--fg-secondary)]">Concurrency</span>
+                <span class="font-mono text-[var(--warning)]">-- conn</span>
+              </div>
+              <div class="h-2 rounded-full bg-[var(--bg)] border border-[var(--border)]">
+                <div class="h-full rounded-full bg-[var(--warning)]" style="width: 0%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between text-sm mb-2">
+                <span class="text-[var(--fg-secondary)]">Pressure</span>
+                <span class="font-mono text-[var(--danger)]">--%</span>
+              </div>
+              <div class="h-2 rounded-full bg-[var(--bg)] border border-[var(--border)]">
+                <div class="h-full rounded-full bg-[var(--danger)]" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-5">
+        <h2 class="text-base font-semibold mb-1">Workload Latency Decomposition</h2>
+        <p class="text-sm text-[var(--fg-muted)] mb-4">Attribution of latency to workload factors</p>
+        <div class="chart-placeholder" style="min-height: 200px;">
+          <svg class="chart-placeholder-icon" style="width: 36px; height: 36px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/>
+          </svg>
+          <p class="text-sm text-[var(--fg-muted)]">Decomposition analysis</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- DECOMPOSITION VIEW -->
+    <div id="view-decomposition" class="view-panel">
+      <div class="card p-5 mb-6">
+        <h2 class="text-base font-semibold mb-1">Intra-Workload Latency Deviation Decomposition</h2>
+        <p class="text-sm text-[var(--fg-muted)] mb-4">Task-level contributions to latency deviation within workloads</p>
+        <div class="chart-placeholder" style="min-height: 300px;">
+          <svg class="chart-placeholder-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/>
+          </svg>
+          <p class="text-sm text-[var(--fg-secondary)]">Task contribution decomposition</p>
+          <p class="text-xs text-[var(--fg-muted)] font-mono">Inter-workload vs Intra-workload vs Hidden</p>
+        </div>
+      </div>
+
+      <div class="card overflow-hidden">
+        <div class="p-5 border-b border-[var(--border)]">
+          <h2 class="text-base font-semibold">Route Contribution Analysis</h2>
+          <p class="text-sm text-[var(--fg-muted)]">Contribution of each route to system latency deviation</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Route</th>
+                <th class="text-right">Base Latency</th>
+                <th class="text-right">Deviation</th>
+                <th class="text-right">Contribution</th>
+                <th class="text-right">Trend</th>
+              </tr>
+            </thead>
+            <tbody id="routeTable" class="font-mono text-sm">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- LATENT MATRIX VIEW -->
+    <div id="view-matrix" class="view-panel">
+      <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
+        <div class="xl:col-span-3 card p-5">
+          <div class="mb-4">
+            <h2 class="text-base font-semibold">Latent Resource-Route Interaction Matrix</h2>
+            <p class="text-sm text-[var(--fg-muted)]">Pressure on latent resources by route: p(t, r)</p>
+          </div>
+          
+          <div class="overflow-x-auto">
+            <table class="data-table" id="matrixTable">
+              <!-- Populated by JS -->
+            </table>
+          </div>
+
+          <div class="mt-4 flex items-center gap-4 text-xs text-[var(--fg-muted)]">
+            <span class="flex items-center gap-1">
+              <span class="w-4 h-4 rounded" style="background: var(--success-light);"></span> Low pressure
+            </span>
+            <span class="flex items-center gap-1">
+              <span class="w-4 h-4 rounded" style="background: var(--warning-light);"></span> Medium
+            </span>
+            <span class="flex items-center gap-1">
+              <span class="w-4 h-4 rounded" style="background: var(--danger-light);"></span> High
+            </span>
+          </div>
+        </div>
+
+        <div class="card p-5">
+          <h2 class="text-base font-semibold mb-4">Latent Resources</h2>
+          <div class="space-y-3" id="latentResources">
+            <!-- Populated by JS -->
+          </div>
+
+          <div class="mt-6 pt-4 border-t border-[var(--border)]">
+            <h3 class="text-sm font-semibold mb-3">Matrix Properties</h3>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between">
+                <span class="text-[var(--fg-muted)]">Rank</span>
+                <span class="font-mono">--</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-[var(--fg-muted)]">Condition No.</span>
+                <span class="font-mono">--</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-[var(--fg-muted)]">Sparsity</span>
+                <span class="font-mono">--</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ELASTICITY VIEW -->
+    <div id="view-elasticity" class="view-panel">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div class="card p-5">
+          <h2 class="text-base font-semibold mb-1">System Elasticity</h2>
+          <p class="text-sm text-[var(--fg-muted)] mb-4">Rate of latency change: dL/dW</p>
+          <div class="chart-placeholder" style="min-height: 280px;">
+            <svg class="chart-placeholder-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+            </svg>
+            <p class="text-sm text-[var(--fg-secondary)]">Elasticity derivative</p>
+            <p class="text-xs text-[var(--fg-muted)] font-mono">Saturation detection</p>
+          </div>
+        </div>
+
+        <div class="card p-5">
+          <h2 class="text-base font-semibold mb-1">Phase Space</h2>
+          <p class="text-sm text-[var(--fg-muted)] mb-4">Latency vs Workload trajectory</p>
+          <div class="chart-placeholder" style="min-height: 280px;">
+            <svg class="chart-placeholder-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <p class="text-sm text-[var(--fg-secondary)]">Phase trajectory</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-5">
+        <h2 class="text-base font-semibold mb-1">System Bifurcation Analysis</h2>
+        <p class="text-sm text-[var(--fg-muted)] mb-4">Critical workload thresholds and regime transitions</p>
+        <div class="chart-placeholder" style="min-height: 280px;">
+          <svg class="chart-placeholder-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+          </svg>
+          <p class="text-sm text-[var(--fg-secondary)]">Bifurcation diagram</p>
+          <p class="text-xs text-[var(--fg-muted)] font-mono">Identify regime boundaries</p>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-[var(--border)] mt-8 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-[var(--fg-muted)]">
+        <span>System Performance Model Tool</span>
+        <span class="font-mono">Model: M = (H, Z, E, W, T, C, P)</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // ========================================
+    // Data
+    // ========================================
+    const ROUTES = [
+      'api/users',
+      'api/orders', 
+      'api/products',
+      'api/auth',
+      'api/search',
+      'api/analytics',
+      'api/checkout',
+      'api/inventory'
+    ];
+
+    const LATENT_RESOURCES = [
+      { name: 'CPU Intensive', key: 'cpu' },
+      { name: 'I/O Bound', key: 'io' },
+      { name: 'Memory Pressure', key: 'mem' },
+      { name: 'Network BW', key: 'net' },
+      { name: 'Lock Contention', key: 'lock' },
+      { name: 'Queue Depth', key: 'queue' }
+    ];
+
+    // ========================================
+    // DOM Elements
+    // ========================================
+    const tabs = document.querySelectorAll('.nav-tab');
+    const viewPanels = document.querySelectorAll('.view-panel');
+    const scopeChips = document.querySelectorAll('.chip[data-scope]');
+
+    // ========================================
+    // View Navigation
+    // ========================================
+    function switchView(viewName) {
+      tabs.forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.view === viewName);
+      });
+
+      viewPanels.forEach(panel => {
+        panel.classList.toggle('active', panel.id === `view-${viewName}`);
+      });
+    }
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => switchView(tab.dataset.view));
+    });
+
+    // Scope chip toggle
+    scopeChips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        scopeChips.forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+      });
+    });
+
+    // ========================================
+    // Render Tables
+    // ========================================
+    function renderRouteTable() {
+      const tbody = document.getElementById('routeTable');
+      if (!tbody) return;
+
+      let html = '';
+      ROUTES.forEach(route => {
+        html += `
+          <tr>
+            <td class="font-medium">${route}</td>
+            <td class="text-right text-[var(--fg-muted)]">-- ms</td>
+            <td class="text-right text-[var(--warning)]">-- ms</td>
+            <td class="text-right text-[var(--fg-muted)]">--%</td>
+            <td class="text-right">
+              <span class="px-2 py-0.5 rounded bg-[var(--bg)] text-[var(--fg-muted)]">--</span>
+            </td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = html;
+    }
+
+    function renderMatrixTable() {
+      const table = document.getElementById('matrixTable');
+      if (!table) return;
+
+      let html = '<thead><tr><th>Route</th>';
+      LATENT_RESOURCES.forEach((r, i) => {
+        html += `<th class="text-center">R${i + 1}</th>`;
+      });
+      html += '</tr></thead><tbody>';
+
+      ROUTES.forEach(route => {
+        html += `<tr><td class="font-medium">${route}</td>`;
+        LATENT_RESOURCES.forEach(() => {
+          html += `<td class="text-center">
+            <div class="w-8 h-8 mx-auto rounded bg-[var(--bg)] border border-[var(--border)] flex items-center justify-center text-xs text-[var(--fg-muted)]">--</div>
+          </td>`;
+        });
+        html += '</tr>';
+      });
+
+      html += '</tbody>';
+      table.innerHTML = html;
+    }
+
+    function renderLatentResources() {
+      const container = document.getElementById('latentResources');
+      if (!container) return;
+
+      let html = '';
+      LATENT_RESOURCES.forEach((r, i) => {
+        html += `
+          <div class="p-3 rounded-lg bg-[var(--bg)] border border-[var(--border)]">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm text-[var(--fg-secondary)]">${r.name}</span>
+              <span class="text-xs font-mono text-[var(--fg-muted)]">R${i + 1}</span>
+            </div>
+            <div class="h-1.5 rounded-full bg-[var(--border)]">
+              <div class="h-full rounded-full bg-[var(--accent)]" style="width: 0%"></div>
+            </div>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    }
+
+    // ========================================
+    // Keyboard Navigation
+    // ========================================
+    document.addEventListener('keydown', (e) => {
+      if (e.target.classList.contains('nav-tab')) {
+        const tabList = Array.from(tabs);
+        const currentIdx = tabList.indexOf(e.target);
+
+        if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          const next = tabList[(currentIdx + 1) % tabList.length];
+          next.focus();
+          next.click();
+        } else if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          const prev = tabList[(currentIdx - 1 + tabList.length) % tabList.length];
+          prev.focus();
+          prev.click();
+        }
+      }
+    });
+
+    // ========================================
+    // Initialize
+    // ========================================
+    document.addEventListener('DOMContentLoaded', () => {
+      renderRouteTable();
+      renderMatrixTable();
+      renderLatentResources();
+    });
+  </script>
+</body>
+</html>
