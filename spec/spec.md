@@ -46,14 +46,15 @@ This is not random missingness — it is informative censoring, since the probab
 
 - TIME: Timestamp of the window (e.g., 1min, 5min, 10min, etc.)
 - ROUTE: Route of the request.
-- OBSERVED: Dictionary with computed statistics (avg, p50, p75, var_log, max, p95, count)
+- WORKLOAD: Total workload for the time window
+- OBSERVED: Dictionary with computed statistics (avg, p50, p75, var_log, max, p95)
 - EXPECTED: Dictionary with computed historical statistics (p50, p75, var_log)
-- DEVIATION: Normalized  OBSERVED - avg - EXPECTED.p50)
+- DEVIATION: Normalized  OBSERVED - avg - EXPECTED.p50), the log variance of this.
 
 ### System Wide Data
 
 - TIME: Timestamp of the window (e.g., 1min, 5min, 10min, etc.)
-- VALUE: System-wide aggregated deviation value
+- VALUE: System-wide aggregated deviation, computed as the WORKLOAD-weighted expectation of route-level deviations.
 - WORKLOAD: Total workload for the time window
 
 ## Expected-Reference Data Computation
