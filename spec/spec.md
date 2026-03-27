@@ -1,15 +1,25 @@
 # Latency Modelling Specification
 
+> This document defines a comprehensive framework for modeling, analyzing, and representing system latency. The goal is to construct a **data-driven, explainable, and multi-resolution latency model** that captures the behavior of requests across system routes, workloads, and resources.
+
+Open Questions:
+
+- For efficiency, we rely on 1‑minute metrics to avoid recomputing over many GBs of data. How can we maintain consistency when supporting multi-resolution aggregation? Specifically, how can we ensure that, for example, the P95 latency over one hour matches the P95 derived from the aggregation of 1‑minute buckets?
+  - t-digest,
+  - **HDR** Histogram.
+- How can we reason about the identifiability of the latent resource–route matrix?
+
+## Formulation
+
 We aim to construct a latency model from observational data stored in a CSV file with the following schema:
 
 - **TIME** — timestamp of the request,
 - **ROUTE** — endpoint or service identifier,
 - **DURATION** — request latency (in milliseconds).
 
-## Formulation
+Build some **metric** - that **capture** the latecy of the system - and routes over time, with the form:
 
-- Build some **metric** - that **capture** the latecy of the system - and routes over time, with the form:
-  - **TIME** — aggregation timestamp (aligned to resolution)
+- **TIME** — aggregation timestamp (aligned to resolution)
   - **VALUE** — metric computation.
   - **WORKLOAD** — request volume (count) within the interval
 - Support **explanation** (that connection of the latency data - or deriveed data) with the underlying system ontology.
@@ -95,34 +105,154 @@ The dataset exhibits right-censoring bias:
 
 This is not random missingness — it is informative censoring, since the probability of missing data increases with latency.
 
-## Metric
+## Representation View
 
-> TO BE CONTINUE HERE -> ...
+> How to **provide a set of analytical views** over the system’s state and dynamics that support latency characterization and diagnostic analysis?
 
-Goal: produce a system-wide aggregation across multiple series.
+Categories:
 
-1. **For each route `r`**:
-   - Compute baseline (median/P75) and scale (IQR/std)
-   - Compute deviation for each observation
+- State & Dynamics Views (Phase Space, Elasticity, Bifurcation)
+- Latent & Causal Views (Congestion Inference, Causal Topology)
+- Observability & Statistical Views (Quantile Surfaces, Distributions, Variance)
+- Boundary & Informational Views (Survival/Hazard, Memory Decay)
 
-2. **Weight per route**:
-   - Compute `w_r` based on traffic or importance
+### Time Resolution Route Level Latency Representation
 
-3. **Aggregate**:
-   - Weighted sum or weighted average:
-     \[
-     \text{SystemDeviation}_t = \frac{\sum_r w_r \cdot \text{Deviation}_{r,t}}{\sum_r w_r}
-     \]
+> Which are the metrics that can capture a task latency?
 
-4. **Optional smoothing** for visualization or alerting.
+#### Criteria
 
+| **Criterion**            | **Definition**                                                                                                                                                                          |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Robustness               | Ability of a metric to consistently represent system behavior under variable conditions, including extreme events and fluctuations. Tail sensitivity and persistence detection are key. |
+| Interpretability         | Ease of understanding the metric for operations, diagnostics, and decision-making.                                                                                                      |
+| Computational Efficiency | Suitability for high-frequency, multi-route measurements without excessive resource consumption.                                                                                        |
+| Sensitivity              | Ability to capture small but meaningful changes in latency dynamics, detecting deviations from baseline.                                                                                |
 
-### Route Level
+#### Metrics
+
+| **Metric**                              | **Description**                                                                             | **Evaluation**                                                                                                                            |
+| --------------------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Average                                 | Arithmetic mean of all latency measurements in the interval.                                | Robustness: Low (sensitive to outliers) <br> Interpretability: High <br> Computational Efficiency: High <br> Sensitivity: Medium          |
+| P50 Average (Median)                    | 50th percentile latency, central value of the distribution.                                 | Robustness: Medium (resistant to outliers) <br> Interpretability: High <br> Computational Efficiency: High <br> Sensitivity: Medium       |
+| P75 Average                             | 75th percentile latency, captures moderate tail behavior.                                   | Robustness: Medium-High (captures moderate tail) <br> Interpretability: High <br> Computational Efficiency: High <br> Sensitivity: Medium |
+| Spread Measure: Variance of Log-Latency | Measures variability in log-transformed latencies, highlighting multiplicative differences. | Robustness: High (captures tail spread) <br> Interpretability: Medium <br> Computational Efficiency: Medium <br> Sensitivity: High        |
+| Max Value                               | Maximum observed latency in the interval.                                                   | Ro                                                                                                                                        |
+
+### Time Resolution System Level Latency Representation
 
 > ...
 
-### System Level
+### Time Resolution Route Level Latency Rate of Change Representation
 
 > ...
+
+### Time Resolution System Level Latency Rate of Change Representation
+
+> ...
+
+### Time Resolution Route Level Latency Deviation Representation
+
+> ...
+
+### Time Resolution System Level Latency Deviation Representation
+
+> ...
+
+### Time Resolution Variance Latency Representation
+
+> ..
+
+### System Latency Distribution Representation
+
+> ...
+
+### Route Latency Distributon Representation
+
+> ...
+
+### System Quantile Surface Representation
+
+> ...
+
+### Route Quantile Surface Representation
+
+> ...
+
+### System Workload Based Latency Representation
+
+> $L = f(W)$
+
+### System Elasticity Representation
+
+> $\frac{dL}{dW}$
+
+> How to characterize and represent the system’s ability to absorb, adapt to, and recover from variations in workload and operating conditions without degradation of performance?
+
+### System Workload Latency Decomposition Representation
+
+> ...
+
+### (Intra) System Latency Deviation Decomposition Representation
+
+> How can we explain **System Latency Deviation** at different levels: inter-workload (history), intra-workload, and hidden variables? Specifically, how can we decompose the intra-workload latency deviation contributions down to the lowest level of task computation within a workload?
+
+> In this section, we focus on: **decomposing the intra-workload latency deviation contributions**.
+
+> See other strategies in [A Guide to Times Series Regime Change - System Latency Deviation Decomposition Representation](https://www.notion.so/A-Guide-to-Times-Series-Regime-Change-32ec0f5171ec806d991fdc62b49f9813?source=copy_link).
+
+#### Problem Definition
+
+- The goal i sto produce a a repersntaion that can aid simulation of workload latency.
+- For a task set of size $n$, there are $2^n$ possible subsets (workload), assuming the order of tasks does not matter.
+- The goal is to quantify how each task within a workload contributes to the observed latency deviation.
+- The goal is to be aware of the interaction (interference) - between the routes - and how this impacts latency deviation - for a latter analysis -  of the routes - and resources used by them.
+
+#### Strategy
+
+> We aim to learn a **latent resource–route interaction model** that characterizes how each task engages system resources across all workloads, and how these interactions contribute to **intra-workload latency deviations**.
+
+> This approach follows a common modeling pattern observed in **Latent Dirichlet Allocation (LDA), Structural Equation Models (SEM), low-rank interaction models, latent factor models**, and related frameworks.
+
+> The resulting **latent interaction matrix** can be leveraged for **diagnostic analysis, workload optimization,** and **predictive modeling of system latency** under new workload combinations.
+
+#### Latent Share Resource Utilization Matrix
+
+> **Note:** The resources are abstract, latent, and synthetic, learned from the model. The **resulting matrix** captures how each route contributes to **latent resources**. It can later be used to **analyze and explain the contribution of interference** between tasks within a workload to the observed latency deviation.
+
+> Each entry $p_{t,r}$ represents the **pressure or utilization of latent resource $r$ by task $t$**.
+
+| **Route (Task)** | **Latent Resource 1** | **Latent Resource 2** | **Latent Resource 3** | **Latent Resource 4** | … |
+| ---------------- | -------------- | -------------- | -------------- | -------------- | - |
+| **Route 1**      | $p_{1,1}$      | $p_{2,1}$      | $p_{3,1}$      | $p_{4,1}$      | … |
+| **Route 2**      | $p_{1,2}$      | $p_{2,2}$      | $p_{3,2}$      | $p_{4,2}$      | … |
+| **Route 3**      | $p_{1,3}$      | $p_{2,3}$      | $p_{3,3}$      | $p_{4,3}$      | … |
+| **…**            | …              | …              | …              | …              | … |
+
+#### Implementation
+
+> ...
+
+### History Latency Dependency Representation
+
+> How current latency depends on pass latencies?
+
+### Censored Latency Representation
+
+> ....
+
+### System Bifurcation Representation
+
+> ...
+
+### Latent State (Congestion) Inference Representation
+
+You defined Zt​∼P(⋅∣St​,Wt​) as unobserved internal structure. You need a view that represents the inferred hidden state—such as estimated shadow queue depth or lock contention—using techniques like Hidden Markov Models or Kalman filtering on the observed Lt​.
 
 ### Critique
+
+> ...
+
+## Validation
+
+> How to validate the the resulting representations?
