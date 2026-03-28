@@ -11,6 +11,7 @@
   <style>
     :root {
       --bg: #f8fafc;
+      --bg-alt: #f1f5f9; 
       --bg-card: #ffffff;
       --fg: #0f172a;
       --fg-secondary: #475569;
@@ -25,6 +26,8 @@
       --success-light: #d1fae5;
       --border: #e2e8f0;
       --border-dark: #cbd5e1;
+      --overlay: rgba(15, 23, 42, 0.4); 
+      --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.1); 
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -96,6 +99,22 @@
       border-color: var(--accent);
       color: var(--accent);
     }
+    
+    /* Ghost Button for Docs/Toolbox */
+    .btn-ghost { 
+      display: inline-flex; 
+      align-items: center; 
+      justify-content: center; 
+      background: transparent; 
+      border: none; 
+      color: var(--fg-muted); 
+      padding: 8px; 
+      border-radius: 6px; 
+      cursor: pointer; 
+      transition: all 0.2s ease; 
+    }
+    .btn-ghost:hover { background: var(--bg-alt); color: var(--fg); }
+    .btn-ghost:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
     /* Chips */
     .chip {
@@ -238,6 +257,117 @@
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-track { background: var(--bg); }
     ::-webkit-scrollbar-thumb { background: var(--border-dark); border-radius: 4px; }
+    
+    /* --- DOCS/MODAL STYLES --- */
+
+    /* Dropdown Menu */
+    .dropdown { position: relative; }
+    .dropdown-menu {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      width: 220px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: var(--shadow-lg);
+      z-index: 60;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-10px) scale(0.95);
+      transition: all 0.15s ease;
+      overflow: hidden;
+      padding: 6px;
+    }
+    .dropdown-menu.active { opacity: 1; visibility: visible; transform: translateY(0) scale(1); }
+
+    .dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 8px 10px;
+      text-align: left;
+      font-size: 13px;
+      color: var(--fg-secondary);
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .dropdown-item:hover { background: var(--bg-alt); color: var(--fg); }
+    .dropdown-item svg { width: 16px; height: 16px; color: var(--fg-muted); }
+    .dropdown-item:hover svg { color: var(--accent); }
+
+    /* Modal Styles */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--overlay);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s ease;
+      backdrop-filter: blur(4px);
+    }
+    .modal-overlay.active { opacity: 1; visibility: visible; }
+    .modal-content {
+      background: var(--bg-card);
+      border-radius: 12px;
+      box-shadow: var(--shadow-lg);
+      width: 100%;
+      max-width: 600px;
+      max-height: 85vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transform: scale(0.95);
+      transition: transform 0.2s ease;
+    }
+    .modal-overlay.active .modal-content { transform: scale(1); }
+
+    /* Shortcut Keys Styles */
+    .kbd {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 22px;
+      height: 22px;
+      padding: 0 6px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--fg);
+      background: var(--bg-alt);
+      border: 1px solid var(--border-dark);
+      border-radius: 4px;
+      box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+    }
+
+    .shortcut-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between; 
+      padding: 8px 0; 
+      border-bottom: 1px solid var(--border);
+    }
+    .shortcut-row:last-child { border-bottom: none; }
+    
+    .shortcut-group-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
   </style>
 </head>
 <body>
@@ -271,6 +401,31 @@
             <option value="60min">60 min</option>
             <option value="1day">1 day</option>
           </select>
+          
+          <!-- Toolbox Button -->
+          <div class="dropdown">
+            <button id="toolboxBtn" class="btn-ghost" aria-label="Open Toolbox" aria-haspopup="true">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+              </svg>
+            </button>
+
+            <div id="dropdownMenu" class="dropdown-menu" role="menu">
+              <button class="dropdown-item" onclick="openDocModal(); closeDropdowns();" role="menuitem">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                <span>Documentation</span>
+              </button>
+              <button class="dropdown-item" onclick="openHelpModal(); closeDropdowns();" role="menuitem">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>Keyboard Shortcuts</span>
+              </button>
+              <button class="dropdown-item" onclick="triggerExport(); closeDropdowns();" role="menuitem">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                <span>Download Data</span>
+              </button>
+            </div>
+          </div>
+          
         </div>
       </div>
     </div>
@@ -652,6 +807,87 @@
     </div>
   </footer>
 
+  <!-- HELP MODAL -->
+  <div id="helpModal" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-content">
+      <div class="flex items-center justify-between p-4 border-b border-[var(--border)]">
+        <h2 class="text-base font-semibold">Keyboard Shortcuts</h2>
+        <button onclick="closeHelpModal()" class="btn-ghost rounded-full p-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      </div>
+      <div class="p-6 overflow-y-auto text-sm" style="max-height: 70vh;">
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <!-- Navigation -->
+          <div>
+            <div class="shortcut-group-title">Navigation</div>
+            <div class="space-y-1">
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Switch Views (1-6)</span><div class="flex gap-1"><span class="kbd">1</span><span class="kbd">6</span></div></div>
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Previous View</span><span class="kbd">←</span></div>
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Next View</span><span class="kbd">→</span></div>
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Go to Latency</span><div class="flex"><span class="kbd">G</span><span class="kbd ml-1">L</span></div></div>
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Go to Matrix</span><div class="flex"><span class="kbd">G</span><span class="kbd ml-1">M</span></div></div>
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Go to Distribution</span><div class="flex"><span class="kbd">G</span><span class="kbd ml-1">D</span></div></div>
+            </div>
+          </div>
+
+          <!-- View Control -->
+          <div>
+            <div class="shortcut-group-title">View Control</div>
+            <div class="space-y-1">
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Toggle Scope (System/Routes)</span><span class="kbd">S</span></div>
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Cycle Time Resolution</span><span class="kbd">T</span></div>
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Focus Mode (Hide UI)</span><span class="kbd">F</span></div>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div>
+            <div class="shortcut-group-title">Actions</div>
+            <div class="space-y-1">
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Refresh Analysis</span><span class="kbd">R</span></div>
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Export Data</span><div class="flex"><span class="kbd">Ctrl</span><span class="kbd ml-1">E</span></div></div>
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Toggle Dark Mode</span><span class="kbd">D</span></div>
+            </div>
+          </div>
+
+          <!-- System -->
+          <div>
+            <div class="shortcut-group-title">System</div>
+            <div class="space-y-1">
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Open Help</span><span class="kbd">F1</span></div>
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Open Toolbox</span><span class="kbd">?</span></div>
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Close Modal</span><span class="kbd">Esc</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-[var(--border)] text-xs text-[var(--fg-muted)]">
+          <p><strong class="text-[var(--fg-secondary)]">Tip:</strong> Power users can chain navigation shortcuts (e.g., pressing <span class="kbd mx-1 text-[10px]">G</span> then <span class="kbd mx-1 text-[10px]">L</span> rapidly) for quick access.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DOCS MODAL -->
+  <div id="docModal" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-content">
+      <div class="flex items-center justify-between p-4 border-b border-[var(--border)]">
+        <h2 class="text-base font-semibold">Documentation</h2>
+        <button onclick="closeDocModal()" class="btn-ghost rounded-full p-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      </div>
+      <div class="p-6 overflow-y-auto text-sm space-y-4">
+        <div class="p-3 rounded bg-[var(--bg-alt)] border border-[var(--border)]">
+          <h3 class="font-semibold text-[var(--fg)]">System Model Specification</h3>
+          <p class="text-xs text-[var(--fg-muted)] mt-1">Definition of M = (H, Z, E, W, T, C, P)</p>
+        </div>
+        <div class="p-3 rounded bg-[var(--bg-alt)] border border-[var(--border)]">
+          <h3 class="font-semibold text-[var(--fg)]">Latent Matrix Decomposition</h3>
+          <p class="text-xs text-[var(--fg-muted)] mt-1">Understanding the latent resource-route interaction</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     // ========================================
     // Data
@@ -675,6 +911,8 @@
       { name: 'Lock Contention', key: 'lock' },
       { name: 'Queue Depth', key: 'queue' }
     ];
+    
+    const VIEWS = ['latency', 'distribution', 'workload', 'decomposition', 'matrix', 'elasticity'];
 
     // ========================================
     // DOM Elements
@@ -682,23 +920,28 @@
     const tabs = document.querySelectorAll('.nav-tab');
     const viewPanels = document.querySelectorAll('.view-panel');
     const scopeChips = document.querySelectorAll('.chip[data-scope]');
+    const toolboxBtn = document.getElementById('toolboxBtn');
+    const dropdownMenu = document.getElementById('dropdownMenu');
+    const helpModal = document.getElementById('helpModal');
+    const docModal = document.getElementById('docModal');
 
     // ========================================
     // View Navigation
     // ========================================
-    function switchView(viewName) {
-      tabs.forEach(tab => {
-        tab.classList.toggle('active', tab.dataset.view === viewName);
-      });
+    let currentViewIndex = 0;
 
-      viewPanels.forEach(panel => {
-        panel.classList.toggle('active', panel.id === `view-${viewName}`);
-      });
+    function switchView(viewName) {
+      const index = VIEWS.indexOf(viewName);
+      if (index !== -1) currentViewIndex = index;
+      
+      tabs.forEach((tab, i) => tab.classList.toggle('active', i === currentViewIndex));
+      viewPanels.forEach((p, i) => p.classList.toggle('active', i === currentViewIndex));
     }
 
-    tabs.forEach(tab => {
-      tab.addEventListener('click', () => switchView(tab.dataset.view));
-    });
+    tabs.forEach((tab, i) => tab.addEventListener('click', () => {
+      currentViewIndex = i;
+      switchView(VIEWS[i]);
+    }));
 
     // Scope chip toggle
     scopeChips.forEach(chip => {
@@ -707,6 +950,36 @@
         chip.classList.add('active');
       });
     });
+
+    // ========================================
+    // Docs/Modal Logic
+    // ========================================
+    function toggleDropdown() {
+      const isOpen = dropdownMenu.classList.contains('active');
+      closeDropdowns();
+      if (!isOpen) {
+        dropdownMenu.classList.add('active');
+        toolboxBtn.setAttribute('aria-expanded', 'true');
+      }
+    }
+    function closeDropdowns() {
+      dropdownMenu.classList.remove('active');
+      toolboxBtn.setAttribute('aria-expanded', 'false');
+    }
+    
+    toolboxBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleDropdown(); });
+    document.addEventListener('click', (e) => {
+      if (!dropdownMenu.contains(e.target) && !toolboxBtn.contains(e.target)) closeDropdowns();
+    });
+
+    function openHelpModal() { helpModal.classList.add('active'); }
+    function closeHelpModal() { helpModal.classList.remove('active'); }
+    function openDocModal() { docModal.classList.add('active'); }
+    function closeDocModal() { docModal.classList.remove('active'); }
+    function triggerExport() { alert("Exporting data..."); }
+
+    helpModal.addEventListener('click', (e) => { if (e.target === helpModal) closeHelpModal(); });
+    docModal.addEventListener('click', (e) => { if (e.target === docModal) closeDocModal(); });
 
     // ========================================
     // Render Tables
@@ -780,23 +1053,70 @@
     // ========================================
     // Keyboard Navigation
     // ========================================
-    document.addEventListener('keydown', (e) => {
-      if (e.target.classList.contains('nav-tab')) {
-        const tabList = Array.from(tabs);
-        const currentIdx = tabList.indexOf(e.target);
+    let lastKey = '', lastTime = 0;
+    const COMBO_THRESHOLD = 400; // ms
 
-        if (e.key === 'ArrowRight') {
-          e.preventDefault();
-          const next = tabList[(currentIdx + 1) % tabList.length];
-          next.focus();
-          next.click();
-        } else if (e.key === 'ArrowLeft') {
-          e.preventDefault();
-          const prev = tabList[(currentIdx - 1 + tabList.length) % tabList.length];
-          prev.focus();
-          prev.click();
-        }
+    document.addEventListener('keydown', (e) => {
+      const key = e.key.toLowerCase();
+      const now = Date.now();
+      const isCombo = (now - lastTime) < COMBO_THRESHOLD;
+
+      // Ignore if typing in input
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+
+      // Global Escapes
+      if (key === 'escape') { 
+        closeHelpModal();
+        closeDocModal(); 
+        closeDropdowns(); 
+        return; 
       }
+
+      // Open Help (F1)
+      if (key === 'f1') { 
+        e.preventDefault(); // Prevent browser default help
+        openHelpModal(); 
+        return; 
+      }
+
+      // Open Toolbox
+      if (key === '?') { e.preventDefault(); toggleDropdown(); return; }
+
+      // Actions
+      if (key === 'r' && !isCombo) { alert("Refresh triggered"); return; }
+      
+      // Number Keys
+      if (['1','2','3','4','5','6'].includes(key)) { 
+        e.preventDefault();
+        switchView(VIEWS[parseInt(key)-1]); 
+        return; 
+      }
+
+      // Arrow Navigation (Global)
+      if (key === 'arrowright') { currentViewIndex = (currentViewIndex + 1) % VIEWS.length; switchView(VIEWS[currentViewIndex]); return; }
+      if (key === 'arrowleft') { currentViewIndex = (currentViewIndex - 1 + VIEWS.length) % VIEWS.length; switchView(VIEWS[currentViewIndex]); return; }
+
+      // Combo Logic (G + Key)
+      if (isCombo && lastKey === 'g') {
+        if (key === 'l') { switchView('latency'); }
+        if (key === 'd') { switchView('distribution'); }
+        if (key === 'w') { switchView('workload'); }
+        if (key === 'x') { switchView('decomposition'); }
+        if (key === 'm') { switchView('matrix'); }
+        if (key === 'e') { switchView('elasticity'); }
+        lastKey = '';
+        return;
+      }
+
+      // Ctrl/Cmd + E for Export
+      if ((e.ctrlKey || e.metaKey) && key === 'e') {
+        e.preventDefault();
+        triggerExport();
+        return;
+      }
+
+      lastKey = key;
+      lastTime = now;
     });
 
     // ========================================
