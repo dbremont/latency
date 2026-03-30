@@ -1,3 +1,6 @@
+import pandas as pd
+import numpy as np
+
 # =========================
 # MODEL CONFIG
 # =========================
@@ -239,27 +242,64 @@ def compute_system_stats(base: pd.DataFrame) -> pd.DataFrame:
     Aggregation strategy:
     - For each time window and route compute:
     - TIME: Start of the window
-    - VALUE = - VALUE: System-wide aggregated deviation, computed as the WORKLOAD-weighted expectation of route-level deviations.
-    - WORKLOAD = Σ WORKLOAD 
+    - VALUE = System-wide aggregated deviation, computed as the ROUTE-WORKLOAD-weighted expectation of route-level deviations.
+    - WORKLOAD = Σ WORKLOAD
     """
 
+    # Extract the 'avg' value from the DEVIATION dictionary
+    dev_avgs = base['DEVIATION'].apply(
+        lambda d: d.get('avg') if isinstance(d, dict) else np.nan
+    )
+    
+    # Create a working copy
     df = base.copy()
-    df = df[df['DEVIATION'].notna()]
-
-    if df.empty:
-        return pd.DataFrame(columns=['TIME', 'VALUE', 'WORKLOAD'])
-
-    df['weighted_dev'] = df['DEVIATION'] * df['WORKLOAD']
-
-    agg = df.groupby('TIME').agg(
-        weighted_sum=('weighted_dev', 'sum'),
-        total_weight=('WORKLOAD', 'sum')
+    df['dev_avg'] = dev_avgs
+    
+    # 1. EXPLICIT ROUTE AGGREGATION
+    # Group by both TIME and ROUTE to ensure we handle each route correctly.
+    # We sum WORKLOAD (in case of multiple entries) and take the mean of deviations.
+    route_stats = df.groupby(['TIME', 'ROUTE']).agg(
+        WORKLOAD=('WORKLOAD', 'sum'),
+        dev_avg=('dev_avg', 'mean')
     ).reset_index()
-
-    agg['VALUE'] = agg['weighted_sum'] / (agg['total_weight'] + EPS)
-    agg['WORKLOAD'] = agg['total_weight']
-
-    return agg[['TIME', 'VALUE', 'WORKLOAD']].sort_values('TIME')
+    
+    # 2. SYSTEM-WIDE AGGREGATION
+    # Now group by TIME only to aggregate across routes
+    
+    # Calculate Total Workload per time window
+    system_workload = route_stats.groupby('TIME')['WORKLOAD'].sum()
+    
+    # Calculate ROUTE-WORKLOAD-weighted expectation
+    # Filter valid deviations
+    valid_routes = route_stats.dropna(subset=['dev_avg'])
+    
+    if not valid_routes.empty:
+        # Calculate weighted sum: Sum(WORKLOAD * DEVIATION) per time window
+        valid_routes['weighted_dev'] = valid_routes['WORKLOAD'] * valid_routes['dev_avg']
+        
+        weighted_sums = valid_routes.groupby('TIME')['weighted_dev'].sum()
+        # Sum of weights (workloads) for valid routes only
+        weight_sums = valid_routes.groupby('TIME')['WORKLOAD'].sum()
+        
+        # Weighted Expectation
+        weighted_expectation = weighted_sums / weight_sums
+        
+        # Reindex to ensure all time windows are present, filling missing with 0
+        weighted_expectation = weighted_expectation.reindex(system_workload.index, fill_value=0)
+    else:
+        weighted_expectation = pd.Series(0.0, index=system_workload.index)
+        
+    # 3. Final Value
+    system_value = -weighted_expectation
+    
+    # Construct output DataFrame
+    result = pd.DataFrame({
+        'TIME': system_workload.index,
+        'VALUE': system_value.values,
+        'WORKLOAD': system_workload.values
+    }).sort_values('TIME').reset_index(drop=True)
+    
+    return result
 
 
 # =========================

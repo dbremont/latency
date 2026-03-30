@@ -2,7 +2,7 @@ import pandas as pd
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.responses import FileResponse
 from typing import Dict
-import metrics 
+import metrics
 
 # =========================
 # CONFIGURATION
@@ -37,8 +37,6 @@ df_raw['TIME'] = pd.to_datetime(
     errors="coerce"
 )
 df_raw = df_raw.sort_values('TIME')
-df_raw = df_raw.set_index('TIME')
-
 
 # =========================
 # PRECOMPUTE BASE
@@ -54,7 +52,7 @@ app = FastAPI(title="Latency System API")
 
 @app.get("/")
 def root():
-    return FileResponse("viz.html")
+    return FileResponse("view/viz.html")
 
 
 @app.get("/docs")

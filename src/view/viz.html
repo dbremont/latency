@@ -1,1068 +1,1777 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>System Latency Observatory</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg: #05080f;
-            --bg-elevated: #0a1019;
-            --bg-card: #0f1824;
-            --fg: #e4eaf4;
-            --fg-muted: #5a6b82;
-            --accent: #00c896;
-            --accent-dim: rgba(0, 200, 150, 0.12);
-            --secondary: #3b82f6;
-            --tertiary: #e6a23c;
-            --border: #1c2938;
-            --danger: #ef4444;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>System Performance Model Tool</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --bg-alt: #f1f5f9; 
+      --bg-card: #ffffff;
+      --fg: #0f172a;
+      --fg-secondary: #475569;
+      --fg-muted: #94a3b8;
+      --accent: #0891b2;
+      --accent-light: #ecfeff;
+      --warning: #f59e0b;
+      --warning-light: #fef3c7;
+      --danger: #dc2626;
+      --danger-light: #fee2e2;
+      --success: #059669;
+      --success-light: #d1fae5;
+      --border: #e2e8f0;
+      --border-dark: #cbd5e1;
+      --overlay: rgba(15, 23, 42, 0.4); 
+      --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.1); 
+    }
 
-        * { box-sizing: border-box; }
-        body {
-            font-family: 'Space Grotesk', sans-serif;
-            background: var(--bg);
-            color: var(--fg);
-            min-height: 100vh;
-        }
-        .font-mono { font-family: 'IBM Plex Mono', monospace; }
-        .bg-pattern {
-            background-image:
-                radial-gradient(ellipse 100% 60% at 50% -10%, rgba(0, 200, 150, 0.06), transparent),
-                radial-gradient(ellipse 80% 50% at 90% 100%, rgba(59, 130, 246, 0.04), transparent);
-        }
-        ::-webkit-scrollbar { width: 5px; height: 5px; }
-        ::-webkit-scrollbar-track { background: var(--bg-elevated); }
-        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--fg-muted); }
-        .card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            transition: border-color 0.25s ease;
-        }
-        .btn {
-            padding: 7px 14px; border-radius: 6px; font-weight: 500; font-size: 12px;
-            transition: all 0.15s ease; cursor: pointer; border: 1px solid var(--border);
-            background: transparent; color: var(--fg-muted);
-            display: inline-flex; align-items: center; gap: 6px;
-        }
-        .btn:hover { background: var(--accent-dim); color: var(--accent); border-color: var(--accent); }
-        .btn.active { background: var(--accent-dim); color: var(--accent); border-color: rgba(0, 200, 150, 0.4); }
-        .btn svg { width: 14px; height: 14px; }
-        
-        .stat-value { font-size: 1.75rem; font-weight: 600; line-height: 1.1; color: var(--fg); }
-        .stat-value.accent { color: var(--accent); }
-        select, input[type="text"] {
-            background: var(--bg-elevated); border: 1px solid var(--border); color: var(--fg);
-            padding: 8px 12px; border-radius: 6px; font-size: 12px;
-        }
-        .chart-container { position: relative; width: 100%; height: 260px; }
-        .chart-container canvas { position: absolute; top: 0; left: 0; }
-        .tooltip {
-            position: fixed; background: var(--bg-elevated); border: 1px solid var(--border);
-            border-radius: 6px; padding: 8px 12px; font-size: 11px; pointer-events: none;
-            opacity: 0; transform: translateY(3px); transition: opacity 0.1s ease;
-            z-index: 1000; box-shadow: 0 6px 20px rgba(0,0,0,0.35);
-            min-width: 140px;
-        }
-        .tooltip.visible { opacity: 1; transform: translateY(0); }
-        @keyframes fadeInUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
-        .animate-in { animation: fadeInUp 0.5s ease forwards; opacity: 0; }
-        .loading-pulse { animation: pulse 1.5s infinite ease-in-out; }
-        .section-tab {
-            position: relative; padding: 10px 16px; color: var(--fg-muted);
-            font-weight: 500; font-size: 13px; cursor: pointer;
-            border-bottom: 2px solid transparent; margin-bottom: -1px;
-        }
-        .section-tab:hover { color: var(--fg); }
-        .section-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-        .data-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg-muted); font-weight: 500; }
-        
-        .loading-overlay {
-            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(5, 8, 15, 0.8); backdrop-filter: blur(2px);
-            display: flex; align-items: center; justify-content: center;
-            z-index: 20; border-radius: 10px;
-        }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
-        /* Modal Styles */
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(4px);
-            z-index: 5000; display: flex; align-items: center; justify-content: center;
-            opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
-        }
-        .modal-overlay.visible { opacity: 1; pointer-events: auto; }
-        .modal-content {
-            background: var(--bg-card); border: 1px solid var(--border);
-            border-radius: 10px; width: 90%; max-width: 600px; max-height: 80vh;
-            overflow: hidden; display: flex; flex-direction: column;
-            transform: scale(0.95); transition: transform 0.2s ease;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-        }
-        .modal-overlay.visible .modal-content { transform: scale(1); }
-        .modal-header {
-            padding: 16px 20px; border-bottom: 1px solid var(--border);
-            display: flex; justify-content: space-between; align-items: center;
-        }
-        .modal-body { padding: 20px; overflow-y: auto; }
-        .modal-close {
-            background: none; border: none; color: var(--fg-muted); cursor: pointer;
-            padding: 4px; border-radius: 4px; transition: all 0.15s;
-        }
-        .modal-close:hover { color: var(--fg); background: var(--accent-dim); }
-    </style>
+    html {
+      font-family: 'IBM Plex Sans', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.5;
+    }
+
+    .font-mono { font-family: 'IBM Plex Mono', monospace; }
+
+    /* Cards */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    /* Tabs */
+    .nav-tab {
+      padding: 10px 18px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--fg-secondary);
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .nav-tab:hover {
+      color: var(--fg);
+      background: var(--bg);
+    }
+
+    .nav-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .nav-tab:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--fg-secondary);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .btn:hover {
+      background: var(--bg);
+      border-color: var(--border-dark);
+    }
+
+    .btn.active {
+      background: var(--accent-light);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    
+    /* Ghost Button for Docs/Toolbox */
+    .btn-ghost { 
+      display: inline-flex; 
+      align-items: center; 
+      justify-content: center; 
+      background: transparent; 
+      border: none; 
+      color: var(--fg-muted); 
+      padding: 8px; 
+      border-radius: 6px; 
+      cursor: pointer; 
+      transition: all 0.2s ease; 
+    }
+    .btn-ghost:hover { background: var(--bg-alt); color: var(--fg); }
+    .btn-ghost:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* Chips */
+    .chip {
+      display: inline-flex;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-family: 'IBM Plex Mono', monospace;
+      border-radius: 4px;
+      background: var(--bg);
+      color: var(--fg-muted);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .chip:hover { color: var(--fg-secondary); }
+
+    .chip.active {
+      background: var(--accent-light);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    /* Metric cards */
+    .metric-value {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 28px;
+      font-weight: 600;
+      line-height: 1.1;
+    }
+
+    .metric-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--fg-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    /* Chart placeholder */
+    .chart-placeholder {
+      position: relative;
+      width: 100%;
+      min-height: 280px;
+      background: linear-gradient(180deg, var(--bg) 0%, var(--bg-card) 100%);
+      border: 1px dashed var(--border-dark);
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+    
+    .chart-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-height: 280px;
+    }
+
+    /* Canvas styles */
+    .chart-container canvas { position: absolute; top: 0; left: 0; }
+
+    .chart-placeholder-icon {
+      width: 48px;
+      height: 48px;
+      color: var(--fg-muted);
+      opacity: 0.6;
+    }
+
+    /* Tooltip styles */
+    .tooltip {
+        position: fixed; background: var(--bg-card); border: 1px solid var(--border);
+        border-radius: 6px; padding: 8px 12px; font-size: 11px; pointer-events: none;
+        opacity: 0; transform: translateY(3px); transition: opacity 0.1s ease;
+        z-index: 1000; box-shadow: var(--shadow-lg);
+        min-width: 140px;
+    }
+    .tooltip.visible { opacity: 1; transform: translateY(0); }
+
+    /* Table */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .data-table th {
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--fg-muted);
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .data-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .data-table tr:hover td {
+      background: var(--bg);
+    }
+
+    /* View panels */
+    .view-panel { display: none; }
+    .view-panel.active { display: block; }
+
+    /* Matrix grid */
+    .matrix-grid {
+      display: grid;
+      gap: 4px;
+    }
+
+    .matrix-cell {
+      aspect-ratio: 1;
+      border-radius: 4px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-family: 'IBM Plex Mono', monospace;
+      color: var(--fg-muted);
+      transition: all 0.15s ease;
+    }
+
+    .matrix-cell:hover {
+      border-color: var(--accent);
+      background: var(--accent-light);
+    }
+
+    /* Animations */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .animate-in {
+      animation: fadeIn 0.4s ease-out forwards;
+      opacity: 0;
+    }
+
+    .stagger-1 { animation-delay: 0.05s; }
+    .stagger-2 { animation-delay: 0.1s; }
+    .stagger-3 { animation-delay: 0.15s; }
+    .stagger-4 { animation-delay: 0.2s; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .animate-in { animation: none; opacity: 1; }
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border-dark); border-radius: 4px; }
+    
+    /* --- DOCS/MODAL STYLES --- */
+
+    /* Dropdown Menu */
+    .dropdown { position: relative; }
+    .dropdown-menu {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      width: 220px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: var(--shadow-lg);
+      z-index: 60;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-10px) scale(0.95);
+      transition: all 0.15s ease;
+      overflow: hidden;
+      padding: 6px;
+    }
+    .dropdown-menu.active { opacity: 1; visibility: visible; transform: translateY(0) scale(1); }
+
+    .dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 8px 10px;
+      text-align: left;
+      font-size: 13px;
+      color: var(--fg-secondary);
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .dropdown-item:hover { background: var(--bg-alt); color: var(--fg); }
+    .dropdown-item svg { width: 16px; height: 16px; color: var(--fg-muted); }
+    .dropdown-item:hover svg { color: var(--accent); }
+
+    /* Modal Styles */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--overlay);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s ease;
+      backdrop-filter: blur(4px);
+    }
+    .modal-overlay.active { opacity: 1; visibility: visible; }
+    .modal-content {
+      background: var(--bg-card);
+      border-radius: 12px;
+      box-shadow: var(--shadow-lg);
+      width: 100%;
+      max-width: 600px;
+      max-height: 85vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transform: scale(0.95);
+      transition: transform 0.2s ease;
+    }
+    .modal-overlay.active .modal-content { transform: scale(1); }
+
+    /* Shortcut Keys Styles */
+    .kbd {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 22px;
+      height: 22px;
+      padding: 0 6px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--fg);
+      background: var(--bg-alt);
+      border: 1px solid var(--border-dark);
+      border-radius: 4px;
+      box-shadow: 0 1px 1px rgba(0,0,0,0.1);
+    }
+
+    .shortcut-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between; 
+      padding: 8px 0; 
+      border-bottom: 1px solid var(--border);
+    }
+    .shortcut-row:last-child { border-bottom: none; }
+    
+    .shortcut-group-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* Loading Overlay */
+    .loading-overlay {
+        position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(248, 250, 252, 0.8); backdrop-filter: blur(2px);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 20; border-radius: 6px;
+    }
+    .loading-pulse { animation: pulse 1.5s infinite ease-in-out; }
+    @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+  </style>
 </head>
-<body class="bg-pattern">
-    <!-- Modals -->
-    <div id="toolboxModal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 class="font-semibold">Toolbox</h3>
-                <button class="modal-close" onclick="closeModal('toolboxModal')">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                </button>
+<body>
+  <!-- Header -->
+  <header class="bg-white border-b border-[var(--border)] sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-lg bg-[var(--accent)] flex items-center justify-center">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-lg font-semibold">System Performance Model</h1>
+            <p class="text-xs text-[var(--fg-muted)] font-mono">Latency Analysis Framework</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-[var(--success-light)] border border-[var(--success)]">
+            <span class="w-2 h-2 rounded-full bg-[var(--success)]" id="statusIndicator"></span>
+            <span class="text-xs font-medium text-[var(--success)]" id="statusText">Ready</span>
+          </div>
+          <select id="resolutionSelect" class="btn font-mono text-xs" aria-label="Time resolution">
+            <option value="1min">1 min</option>
+            <option value="5min">5 min</option>
+            <option value="10min">10 min</option>
+            <option value="25min" selected>25 min</option>
+            <option value="50min">50 min</option>
+            <option value="60min">60 min</option>
+            <option value="1day">1 day</option>
+          </select>
+          
+          <!-- Toolbox Button -->
+          <div class="dropdown">
+            <button id="toolboxBtn" class="btn-ghost" aria-label="Open Toolbox" aria-haspopup="true">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+              </svg>
+            </button>
+
+            <div id="dropdownMenu" class="dropdown-menu" role="menu">
+              <button class="dropdown-item" onclick="openDocModal(); closeDropdowns();" role="menuitem">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                <span>Documentation</span>
+              </button>
+              <button class="dropdown-item" onclick="openHelpModal(); closeDropdowns();" role="menuitem">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>Keyboard Shortcuts</span>
+              </button>
+              <button class="dropdown-item" onclick="triggerExport(); closeDropdowns();" role="menuitem">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                <span>Download Data</span>
+              </button>
             </div>
-            <div class="modal-body">
-                <p class="text-[var(--fg-muted)] text-sm mb-4">System diagnostic tools and utilities.</p>
-                <div class="grid grid-cols-2 gap-3">
-                    <button class="btn justify-center">Latency Injector</button>
-                    <button class="btn justify-center">Cache Purge</button>
-                    <button class="btn justify-center">Trace Analyzer</button>
-                    <button class="btn justify-center">Load Test</button>
-                </div>
+          </div>
+          
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navigation -->
+  <nav class="bg-white border-b border-[var(--border)] overflow-x-auto" aria-label="Main navigation">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6">
+      <div class="flex">
+        <button class="nav-tab active" data-view="latency">Latency</button>
+        <button class="nav-tab" data-view="distribution">Distribution</button>
+        <button class="nav-tab" data-view="workload">Workload</button>
+        <button class="nav-tab" data-view="decomposition">Decomposition</button>
+        <button class="nav-tab" data-view="matrix">Latent Matrix</button>
+        <button class="nav-tab" data-view="elasticity">Elasticity</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+    
+    <!-- LATENCY VIEW -->
+    <div id="view-latency" class="view-panel active">
+      <!-- Metrics -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="card p-4 animate-in stagger-1">
+          <p class="metric-label">System P50</p>
+          <p class="metric-value text-[var(--fg)] mt-2" id="metric-p50">--</p>
+          <p class="text-xs text-[var(--fg-muted)] mt-1 font-mono">milliseconds</p>
+          <div class="mt-3 flex items-center gap-1 text-xs font-mono text-[var(--success)]" id="trend-p50">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+            </svg>
+            --% vs baseline
+          </div>
+        </div>
+
+        <div class="card p-4 animate-in stagger-2">
+          <p class="metric-label">System P95</p>
+          <p class="metric-value text-[var(--warning)] mt-2" id="metric-p95">--</p>
+          <p class="text-xs text-[var(--fg-muted)] mt-1 font-mono">milliseconds</p>
+          <div class="mt-3 flex items-center gap-1 text-xs font-mono text-[var(--danger)]" id="trend-p95">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
+            </svg>
+            --% vs baseline
+          </div>
+        </div>
+
+        <div class="card p-4 animate-in stagger-3">
+          <p class="metric-label">System P99</p>
+          <p class="metric-value text-[var(--danger)] mt-2" id="metric-p99">--</p>
+          <p class="text-xs text-[var(--fg-muted)] mt-1 font-mono">milliseconds</p>
+          <div class="mt-3 flex items-center gap-1 text-xs font-mono text-[var(--danger)]" id="trend-p99">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
+            </svg>
+            --% vs baseline
+          </div>
+        </div>
+
+        <div class="card p-4 animate-in stagger-4">
+          <p class="metric-label">Request Volume</p>
+          <p class="metric-value text-[var(--accent)] mt-2" id="metric-volume">--</p>
+          <p class="text-xs text-[var(--fg-muted)] mt-1 font-mono">requests/interval</p>
+          <div class="mt-3 flex items-center gap-1 text-xs font-mono text-[var(--success)]" id="trend-volume">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+            </svg>
+            --% vs baseline
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Chart -->
+      <div class="card p-5 mb-6 animate-in stagger-3 relative">
+        <div id="loadingOverlay" class="loading-overlay hidden">
+            <div class="text-center">
+                <div class="text-sm font-mono text-[var(--accent)] loading-pulse">WORKING ON IT...</div>
             </div>
         </div>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 class="text-base font-semibold">System Latency Over Time</h2>
+            <p class="text-sm text-[var(--fg-muted)]">Temporal evolution of latency quantiles</p>
+          </div>
+          <div class="flex items-center gap-3">
+             <div class="flex gap-2">
+                <button class="chip active" data-scope="system">System</button>
+                <button class="chip" data-scope="routes">By Route</button>
+            </div>
+            <button class="btn hidden" id="resetZoomBtn">Reset Zoom</button>
+            <span class="text-[10px] font-mono px-2 py-1 rounded bg-[var(--accent-light)] text-[var(--accent)]" id="zoomLevel">1x zoom</span>
+          </div>
+        </div>
+        <div class="chart-container" id="chart-main-container" style="cursor: crosshair; min-height: 300px;">
+           <!-- Canvases injected by JS -->
+        </div>
+      </div>
+
+      <!-- Secondary Charts -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="card p-5 animate-in stagger-4">
+          <h2 class="text-base font-semibold mb-1">Latency Deviation</h2>
+          <p class="text-sm text-[var(--fg-muted)] mb-4">Deviation from baseline latency over time</p>
+          <!-- Changed to chart-container to support ZoomableChart -->
+          <div class="chart-container" id="chart-deviation-container" style="min-height: 200px;">
+             <!-- Canvases injected by JS -->
+          </div>
+        </div>
+
+        <div class="card p-5 animate-in stagger-4">
+          <h2 class="text-base font-semibold mb-1">Workload Intensity</h2>
+          <p class="text-sm text-[var(--fg-muted)] mb-4">Requests per interval</p>
+          <div class="chart-container" id="chart-workload-container" style="min-height: 200px;">
+             <!-- SVG rendered by existing logic -->
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div id="helpModal" class="modal-overlay">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 class="font-semibold">Documentation & Help</h3>
-                <button class="modal-close" onclick="closeModal('helpModal')">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                </button>
+    <!-- DISTRIBUTION VIEW -->
+    <div id="view-distribution" class="view-panel">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div class="card p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-base font-semibold">System Latency Distribution</h2>
+              <p class="text-sm text-[var(--fg-muted)]">Histogram with censoring boundary</p>
             </div>
-            <div class="modal-body">
-                <div class="space-y-4 text-sm">
-                    <div class="bg-[var(--bg-elevated)] p-3 rounded border border-[var(--border)]">
-                        <h4 class="font-semibold text-[var(--accent)] mb-1">Timeline Navigation</h4>
-                        <p class="text-[var(--fg-muted)]">Scroll to zoom, drag to pan. Click two points to perform Root Cause Analysis.</p>
-                    </div>
-                    <div class="bg-[var(--bg-elevated)] p-3 rounded border border-[var(--border)]">
-                        <h4 class="font-semibold text-[var(--accent)] mb-1">Granularity</h4>
-                        <p class="text-[var(--fg-muted)]">Switch between 1-minute and weekly views using the resolution selector.</p>
-                    </div>
-                    <div class="bg-[var(--bg-elevated)] p-3 rounded border border-[var(--border)]">
-                        <h4 class="font-semibold text-[var(--accent)] mb-1">Metrics</h4>
-                        <p class="text-[var(--fg-muted)]">Mean Latency, Efficiency, Anomaly Index, and Memory Score are calculated dynamically based on visible data.</p>
-                    </div>
-                </div>
-            </div>
+            <span class="px-2 py-1 text-xs font-medium bg-[var(--danger-light)] text-[var(--danger)] rounded">Censored</span>
+          </div>
+          <div class="chart-placeholder">
+            <svg class="chart-placeholder-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6z"/>
+            </svg>
+            <p class="text-sm text-[var(--fg-secondary)]">Distribution histogram</p>
+            <p class="text-xs text-[var(--fg-muted)] font-mono">Right-censoring detected</p>
+          </div>
         </div>
+
+        <div class="card p-5">
+          <h2 class="text-base font-semibold mb-1">Route Latency Distribution</h2>
+          <p class="text-sm text-[var(--fg-muted)] mb-4">Comparative distribution across routes</p>
+          <div class="chart-placeholder">
+            <svg class="chart-placeholder-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            </svg>
+            <p class="text-sm text-[var(--fg-secondary)]">Route distributions</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-5">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-base font-semibold">Quantile Surface</h2>
+            <p class="text-sm text-[var(--fg-muted)]">Temporal quantile surface: Q(t, p)</p>
+          </div>
+          <div class="flex gap-2">
+            <button class="chip active">System</button>
+            <button class="chip">Route</button>
+          </div>
+        </div>
+        <div class="chart-placeholder" style="min-height: 300px;">
+          <svg class="chart-placeholder-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/>
+          </svg>
+          <p class="text-sm text-[var(--fg-secondary)]">Quantile surface visualization</p>
+          <p class="text-xs text-[var(--fg-muted)] font-mono">P50, P90, P95, P99 over time</p>
+        </div>
+      </div>
     </div>
 
-    <div id="tooltip" class="tooltip font-mono">
-        <div class="text-[var(--fg-muted)] text-[10px] mb-1" id="tooltip-time"></div>
-        <div class="text-[var(--fg)]" id="tooltip-value"></div>
+    <!-- WORKLOAD VIEW -->
+    <div id="view-workload" class="view-panel">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <div class="lg:col-span-2 card p-5">
+          <h2 class="text-base font-semibold mb-1">Workload-Latency Relationship</h2>
+          <p class="text-sm text-[var(--fg-muted)] mb-4">L = f(W): Latency as a function of workload intensity</p>
+          <div class="chart-placeholder" style="min-height: 320px;">
+            <svg class="chart-placeholder-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            <p class="text-sm text-[var(--fg-secondary)]">Workload vs Latency scatter</p>
+            <p class="text-xs text-[var(--fg-muted)] font-mono">Detect saturation points</p>
+          </div>
+        </div>
+
+        <div class="card p-5">
+          <h2 class="text-base font-semibold mb-4">Workload Components</h2>
+          <div class="space-y-4">
+            <div>
+              <div class="flex justify-between text-sm mb-2">
+                <span class="text-[var(--fg-secondary)]">Intensity</span>
+                <span class="font-mono text-[var(--accent)]">-- req/s</span>
+              </div>
+              <div class="h-2 rounded-full bg-[var(--bg)] border border-[var(--border)]">
+                <div class="h-full rounded-full bg-[var(--accent)]" style="width: 0%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between text-sm mb-2">
+                <span class="text-[var(--fg-secondary)]">Concurrency</span>
+                <span class="font-mono text-[var(--warning)]">-- conn</span>
+              </div>
+              <div class="h-2 rounded-full bg-[var(--bg)] border border-[var(--border)]">
+                <div class="h-full rounded-full bg-[var(--warning)]" style="width: 0%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between text-sm mb-2">
+                <span class="text-[var(--fg-secondary)]">Pressure</span>
+                <span class="font-mono text-[var(--danger)]">--%</span>
+              </div>
+              <div class="h-2 rounded-full bg-[var(--bg)] border border-[var(--border)]">
+                <div class="h-full rounded-full bg-[var(--danger)]" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-5">
+        <h2 class="text-base font-semibold mb-1">Workload Latency Decomposition</h2>
+        <p class="text-sm text-[var(--fg-muted)] mb-4">Attribution of latency to workload factors</p>
+        <div class="chart-placeholder" style="min-height: 200px;">
+          <svg class="chart-placeholder-icon" style="width: 36px; height: 36px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/>
+          </svg>
+          <p class="text-sm text-[var(--fg-muted)]">Decomposition analysis</p>
+        </div>
+      </div>
     </div>
 
-    <div class="max-w-[1440px] mx-auto px-5 py-6">
-        <!-- Header -->
-        <header class="mb-6 animate-in">
-            <div class="flex items-center justify-between flex-wrap gap-4">
-                <div>
-                    <h1 class="text-2xl font-semibold tracking-tight">System Latency Observatory</h1>
-                    <p class="text-sm text-[var(--fg-muted)] mt-1">Infrastructure behavior analysis</p>
-                </div>
-                <div class="flex items-center gap-3">
-                    <div id="statusIndicator" class="flex items-center gap-2 text-xs font-mono px-3 py-1.5 rounded bg-[var(--bg-card)] border border-[var(--border)]">
-                        <span class="w-2 h-2 rounded-full bg-[var(--fg-muted)]" id="statusDot"></span>
-                        <span id="statusText">Initializing...</span>
-                    </div>
-                    
-                    <!-- NEW BUTTONS -->
-                    <button class="btn" id="toolboxBtn">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
-                        Toolbox
-                    </button>
-                    <button class="btn" id="helpBtn">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                        Docs
-                    </button>
+    <!-- DECOMPOSITION VIEW -->
+    <div id="view-decomposition" class="view-panel">
+      <div class="card p-5 mb-6">
+        <h2 class="text-base font-semibold mb-1">Intra-Workload Latency Deviation Decomposition</h2>
+        <p class="text-sm text-[var(--fg-muted)] mb-4">Task-level contributions to latency deviation within workloads</p>
+        <div class="chart-placeholder" style="min-height: 300px;">
+          <svg class="chart-placeholder-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/>
+          </svg>
+          <p class="text-sm text-[var(--fg-secondary)]">Task contribution decomposition</p>
+          <p class="text-xs text-[var(--fg-muted)] font-mono">Inter-workload vs Intra-workload vs Hidden</p>
+        </div>
+      </div>
 
-                    <button class="btn" id="refreshBtn">Refresh Data</button>
-                </div>
-            </div>
-        </header>
-
-        <!-- Controls -->
-        <div class="card p-4 mb-5 animate-in">
-            <div class="flex items-center justify-between flex-wrap gap-4">
-                <div class="flex items-center gap-2 flex-wrap">
-                    <span class="text-xs text-[var(--fg-muted)] mr-1">Resolution:</span>
-                    <button class="btn" data-granularity="1min">1 min</button>
-                    <button class="btn active" data-granularity="5min">5 min</button>
-                    <button class="btn" data-granularity="10min">10 min</button>
-                    <button class="btn" data-granularity="25min">25 min</button>
-                    <button class="btn" data-granularity="50min">50 min</button>
-                    <button class="btn" data-granularity="60min">1 Hour</button>
-                    <button class="btn" data-granularity="1day">1 Day</button>
-                    <button class="btn" data-granularity="1week">1 Week</button>
-                </div>
-            </div>
+      <div class="card overflow-hidden">
+        <div class="p-5 border-b border-[var(--border)]">
+          <h2 class="text-base font-semibold">Route Contribution Analysis</h2>
+          <p class="text-sm text-[var(--fg-muted)]">Contribution of each route to system latency deviation</p>
         </div>
-
-        <!-- Stats -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-            <div class="card p-4 animate-in">
-                <div class="data-label mb-2">Mean Latency</div>
-                <div class="stat-value accent" id="statMean">--</div>
-            </div>
-            <div class="card p-4 animate-in">
-                <div class="data-label mb-2">Avg Efficiency</div>
-                <div class="stat-value" id="statEfficiency">--</div>
-                <div class="text-[10px] text-[var(--fg-muted)]">Value / Workload</div>
-            </div>
-            <div class="card p-4 animate-in">
-                <div class="data-label mb-2">Anomaly Index</div>
-                <div class="stat-value" id="statAnomaly">--</div>
-            </div>
-            <div class="card p-4 animate-in">
-                <div class="data-label mb-2">Memory Score</div>
-                <div class="stat-value" id="statMemory">--</div>
-            </div>
+        <div class="overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Route</th>
+                <th class="text-right">Base Latency</th>
+                <th class="text-right">Deviation</th>
+                <th class="text-right">Contribution</th>
+                <th class="text-right">Trend</th>
+              </tr>
+            </thead>
+            <tbody id="routeTable" class="font-mono text-sm">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
         </div>
-
-        <!-- Tabs -->
-        <div class="flex border-b border-[var(--border)] mb-5 animate-in">
-            <button class="section-tab active" data-section="overview">System Timeline</button>
-            <button class="section-tab" data-section="behavior">System Behavior</button>
-            <button class="section-tab" data-section="routes">Route Horizon</button>
-            <button class="section-tab" data-section="distribution">Distributions</button>
-        </div>
-
-        <!-- Overview Section -->
-        <div id="section-overview" class="section-content">
-            <div class="card p-5 mb-5 animate-in relative">
-                <div id="loadingOverlay" class="loading-overlay hidden">
-                    <div class="text-center">
-                        <div class="text-sm font-mono text-[var(--accent)] loading-pulse">WORKING ON IT...</div>
-                    </div>
-                </div>
-                <div class="flex items-center justify-between mb-4">
-                    <div>
-                        <h3 class="font-medium">System Behavior Timeline</h3>
-                        <p class="text-xs text-[var(--fg-muted)]">Scroll to zoom, drag to pan. Click points A & B for Root Cause Analysis.</p>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <button class="btn hidden" id="resetZoomBtn">Reset Zoom</button>
-                        <span class="text-[10px] font-mono px-2 py-1 rounded bg-[var(--accent-dim)] text-[var(--accent)]" id="zoomLevel">1x zoom</span>
-                    </div>
-                </div>
-                <div class="chart-container" id="mainChartContainer" style="cursor: crosshair; height: 300px;">
-                    <canvas id="mainChart"></canvas>
-                    <canvas id="mainChartOverlay"></canvas>
-                </div>
-                <!-- Analysis Panel -->
-                <div id="analysisPanel" class="border-t border-[var(--border)] mt-4 max-h-0 overflow-hidden opacity-0 transition-all duration-300">
-                    <div class="pt-4">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="font-medium text-[var(--accent)]">Root Cause Analysis</h3>
-                            <button class="btn text-[var(--danger)] border-[var(--danger)] text-xs py-1" id="clearSelection">Clear Selection</button>
-                        </div>
-                        <div class="grid md:grid-cols-3 gap-4 mb-4">
-                            <div class="bg-[var(--bg-elevated)] p-3 rounded-lg">
-                                <div class="data-label">Point A</div>
-                                <div class="font-mono text-sm mt-1" id="pointADetails">--</div>
-                            </div>
-                            <div class="bg-[var(--bg-elevated)] p-3 rounded-lg">
-                                <div class="data-label">Point B</div>
-                                <div class="font-mono text-sm mt-1" id="pointBDetails">--</div>
-                            </div>
-                            <div class="bg-[var(--bg-elevated)] p-3 rounded-lg">
-                                <div class="data-label">System Delta</div>
-                                <div class="font-mono text-xl font-bold mt-1" id="systemDelta">--</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Other Sections -->
-        <div id="section-behavior" class="section-content hidden">
-             <div class="card p-5 animate-in">
-                <h3 class="font-medium mb-4">System Dynamics Analysis</h3>
-                <div class="chart-container" style="height: 280px;" id="behaviorChartContainer"><canvas id="behaviorChart"></canvas></div>
-            </div>
-        </div>
-        <div id="section-routes" class="section-content hidden">
-            <div class="card p-5 animate-in">
-                <div class="border-t border-[var(--border)]" id="horizonContainer"></div>
-            </div>
-        </div>
-        <div id="section-distribution" class="section-content hidden">
-            <div class="card p-5 animate-in">
-                 <div class="chart-container" style="height: 220px;"><canvas id="latencyHist"></canvas></div>
-            </div>
-        </div>
+      </div>
     </div>
 
-    <script>
-        // ========== Configuration ==========
-        const API_BASE = 'http://127.0.0.1:8000';
+    <!-- LATENT MATRIX VIEW -->
+    <div id="view-matrix" class="view-panel">
+      <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
+        <div class="xl:col-span-3 card p-5">
+          <div class="mb-4">
+            <h2 class="text-base font-semibold">Latent Resource-Route Interaction Matrix</h2>
+            <p class="text-sm text-[var(--fg-muted)]">Pressure on latent resources by route: p(t, r)</p>
+          </div>
+          
+          <div class="overflow-x-auto">
+            <table class="data-table" id="matrixTable">
+              <!-- Populated by JS -->
+            </table>
+          </div>
+
+          <div class="mt-4 flex items-center gap-4 text-xs text-[var(--fg-muted)]">
+            <span class="flex items-center gap-1">
+              <span class="w-4 h-4 rounded" style="background: var(--success-light);"></span> Low pressure
+            </span>
+            <span class="flex items-center gap-1">
+              <span class="w-4 h-4 rounded" style="background: var(--warning-light);"></span> Medium
+            </span>
+            <span class="flex items-center gap-1">
+              <span class="w-4 h-4 rounded" style="background: var(--danger-light);"></span> High
+            </span>
+          </div>
+        </div>
+
+        <div class="card p-5">
+          <h2 class="text-base font-semibold mb-4">Latent Resources</h2>
+          <div class="space-y-3" id="latentResources">
+            <!-- Populated by JS -->
+          </div>
+
+          <div class="mt-6 pt-4 border-t border-[var(--border)]">
+            <h3 class="text-sm font-semibold mb-3">Matrix Properties</h3>
+            <div class="space-y-2 text-sm">
+              <div class="flex justify-between">
+                <span class="text-[var(--fg-muted)]">Rank</span>
+                <span class="font-mono">--</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-[var(--fg-muted)]">Condition No.</span>
+                <span class="font-mono">--</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-[var(--fg-muted)]">Sparsity</span>
+                <span class="font-mono">--</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ELASTICITY VIEW -->
+    <div id="view-elasticity" class="view-panel">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div class="card p-5">
+          <h2 class="text-base font-semibold mb-1">System Elasticity</h2>
+          <p class="text-sm text-[var(--fg-muted)] mb-4">Rate of latency change: dL/dW</p>
+          <div class="chart-placeholder" style="min-height: 280px;">
+            <svg class="chart-placeholder-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+            </svg>
+            <p class="text-sm text-[var(--fg-secondary)]">Elasticity derivative</p>
+            <p class="text-xs text-[var(--fg-muted)] font-mono">Saturation detection</p>
+          </div>
+        </div>
+
+        <div class="card p-5">
+          <h2 class="text-base font-semibold mb-1">Phase Space</h2>
+          <p class="text-sm text-[var(--fg-muted)] mb-4">Latency vs Workload trajectory</p>
+          <div class="chart-placeholder" style="min-height: 280px;">
+            <svg class="chart-placeholder-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <p class="text-sm text-[var(--fg-secondary)]">Phase trajectory</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-5">
+        <h2 class="text-base font-semibold mb-1">System Bifurcation Analysis</h2>
+        <p class="text-sm text-[var(--fg-muted)] mb-4">Critical workload thresholds and regime transitions</p>
+        <div class="chart-placeholder" style="min-height: 280px;">
+          <svg class="chart-placeholder-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+          </svg>
+          <p class="text-sm text-[var(--fg-secondary)]">Bifurcation diagram</p>
+          <p class="text-xs text-[var(--fg-muted)] font-mono">Identify regime boundaries</p>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-[var(--border)] mt-8 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-[var(--fg-muted)]">
+        <span>System Performance Model Tool</span>
+        <span class="font-mono">Model: M = (H, Z, E, W, T, C, P)</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Tooltip -->
+  <div id="tooltip" class="tooltip font-mono">
+    <div class="text-[var(--fg-muted)] text-[10px] mb-1" id="tooltip-time"></div>
+    <div class="text-[var(--fg)]" id="tooltip-value"></div>
+  </div>
+
+  <!-- HELP MODAL -->
+  <div id="helpModal" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-content">
+      <div class="flex items-center justify-between p-4 border-b border-[var(--border)]">
+        <h2 class="text-base font-semibold">Keyboard Shortcuts</h2>
+        <button onclick="closeHelpModal()" class="btn-ghost rounded-full p-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      </div>
+      <div class="p-6 overflow-y-auto text-sm" style="max-height: 70vh;">
         
-        const GRANULARITY_MAP = {
-            '1min': '1min', '5min': '5min', '10min': '10min', '25min': '25min',
-            '50min': '50min', '60min': '60min', '1day': '1day', '1week': '1week'
-        };
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <!-- Navigation -->
+          <div>
+            <div class="shortcut-group-title">Navigation</div>
+            <div class="space-y-1">
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Switch Views (1-6)</span><div class="flex gap-1"><span class="kbd">1</span><span class="kbd">6</span></div></div>
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Previous View</span><span class="kbd">←</span></div>
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Next View</span><span class="kbd">→</span></div>
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Go to Latency</span><div class="flex"><span class="kbd">G</span><span class="kbd ml-1">L</span></div></div>
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Go to Matrix</span><div class="flex"><span class="kbd">G</span><span class="kbd ml-1">M</span></div></div>
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Go to Distribution</span><div class="flex"><span class="kbd">G</span><span class="kbd ml-1">D</span></div></div>
+            </div>
+          </div>
 
-        // ========== Helpers ==========
-        function formatLatency(ms) {
-            if (ms == null || isNaN(ms)) return '--';
-            const rawStr = `<span class="opacity-60 text-[10px]">(${ms.toLocaleString()} ms)</span>`;
-            if (ms < 1000) return `<span class="text-[var(--accent)] font-semibold">${ms.toFixed(0)} ms</span>`;
-            const seconds = ms / 1000;
-            if (seconds < 60) return `<span class="text-[var(--accent)] font-semibold">${seconds.toFixed(2)} s</span> ${rawStr}`;
-            const minutes = Math.floor(seconds / 60);
-            const remainSeconds = seconds % 60;
-            if (minutes < 60) return `<span class="text-[var(--accent)] font-semibold">${minutes}m ${remainSeconds.toFixed(0)}s</span> ${rawStr}`;
-            const hours = Math.floor(minutes / 60);
-            const remainMinutes = minutes % 60;
-            return `<span class="text-[var(--accent)] font-semibold">${hours}h ${remainMinutes}m</span> ${rawStr}`;
+          <!-- View Control -->
+          <div>
+            <div class="shortcut-group-title">View Control</div>
+            <div class="space-y-1">
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Toggle Scope (System/Routes)</span><span class="kbd">S</span></div>
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Cycle Time Resolution</span><span class="kbd">T</span></div>
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Focus Mode (Hide UI)</span><span class="kbd">F</span></div>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div>
+            <div class="shortcut-group-title">Actions</div>
+            <div class="space-y-1">
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Refresh Analysis</span><span class="kbd">R</span></div>
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Export Data</span><div class="flex"><span class="kbd">Ctrl</span><span class="kbd ml-1">E</span></div></div>
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Toggle Dark Mode</span><span class="kbd">D</span></div>
+            </div>
+          </div>
+
+          <!-- System -->
+          <div>
+            <div class="shortcut-group-title">System</div>
+            <div class="space-y-1">
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Open Help</span><span class="kbd">F1</span></div>
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Open Toolbox</span><span class="kbd">?</span></div>
+              <div class="shortcut-row"><span class="text-[var(--fg-secondary)]">Close Modal</span><span class="kbd">Esc</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-[var(--border)] text-xs text-[var(--fg-muted)]">
+          <p><strong class="text-[var(--fg-secondary)]">Tip:</strong> Power users can chain navigation shortcuts (e.g., pressing <span class="kbd mx-1 text-[10px]">G</span> then <span class="kbd mx-1 text-[10px]">L</span> rapidly) for quick access.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DOCS MODAL -->
+  <div id="docModal" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-content">
+      <div class="flex items-center justify-between p-4 border-b border-[var(--border)]">
+        <h2 class="text-base font-semibold">Documentation</h2>
+        <button onclick="closeDocModal()" class="btn-ghost rounded-full p-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      </div>
+      <div class="p-6 overflow-y-auto text-sm space-y-4">
+        <div class="p-3 rounded bg-[var(--bg-alt)] border border-[var(--border)]">
+          <h3 class="font-semibold text-[var(--fg)]">System Model Specification</h3>
+          <p class="text-xs text-[var(--fg-muted)] mt-1">Definition of M = (H, Z, E, W, T, C, P)</p>
+        </div>
+        <div class="p-3 rounded bg-[var(--bg-alt)] border border-[var(--border)]">
+          <h3 class="font-semibold text-[var(--fg)]">Latent Matrix Decomposition</h3>
+          <p class="text-xs text-[var(--fg-muted)] mt-1">Understanding the latent resource-route interaction</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ========================================
+    // Configuration & State
+    // ========================================
+    const API_BASE_URL = "http://127.0.0.1:8000"; 
+    let currentData = null;
+
+    const ROUTES = [
+      'api/users',
+      'api/orders', 
+      'api/products',
+      'api/auth',
+      'api/search',
+      'api/analytics',
+      'api/checkout',
+      'api/inventory'
+    ];
+
+    const LATENT_RESOURCES = [
+      { name: 'CPU Intensive', key: 'cpu' },
+      { name: 'I/O Bound', key: 'io' },
+      { name: 'Memory Pressure', key: 'mem' },
+      { name: 'Network BW', key: 'net' },
+      { name: 'Lock Contention', key: 'lock' },
+      { name: 'Queue Depth', key: 'queue' }
+    ];
+    
+    const VIEWS = ['latency', 'distribution', 'workload', 'decomposition', 'matrix', 'elasticity'];
+
+    // Global UI State (Nav, etc)
+    let currentViewIndex = 0;
+
+    // ========================================
+    // DOM Elements
+    // ========================================
+    const tabs = document.querySelectorAll('.nav-tab');
+    const viewPanels = document.querySelectorAll('.view-panel');
+    const scopeChips = document.querySelectorAll('.chip[data-scope]');
+    const toolboxBtn = document.getElementById('toolboxBtn');
+    const dropdownMenu = document.getElementById('dropdownMenu');
+    const helpModal = document.getElementById('helpModal');
+    const docModal = document.getElementById('docModal');
+    const resolutionSelect = document.getElementById('resolutionSelect');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const tooltipEl = document.getElementById('tooltip');
+
+    // ========================================
+    // ZoomableChart Class (Refactored)
+    // ========================================
+    class ZoomableChart {
+      constructor(containerId, options = {}) {
+        this.container = document.getElementById(containerId);
+        if (!this.container) return;
+
+        // Options
+        this.lineColor = options.lineColor || '#0891b2'; // var(--accent)
+        this.overlayColor = options.overlayColor || 'rgba(8, 145, 178, 0.1)';
+        
+        // State
+        this.zoomTransform = { scale: 1, offsetX: 0 };
+        this.isDragging = false;
+        this.lastMouseX = 0;
+        this.hoveredPoint = null;
+        this.data = [];
+        this.dataResolution = '25min';
+        
+        // Canvas Setup
+        this.canvas = document.createElement('canvas');
+        this.canvas.id = containerId + '-canvas';
+        this.overlay = document.createElement('canvas');
+        this.overlay.id = containerId + '-overlay';
+        
+        this.container.innerHTML = ''; 
+        this.container.appendChild(this.canvas);
+        this.container.appendChild(this.overlay);
+
+        this.ctx = this.canvas.getContext('2d');
+        this.octx = this.overlay.getContext('2d');
+        
+        this.padding = { top: 20, right: 20, bottom: 40, left: 50 };
+        
+        this.resize();
+        this.setupInteractions();
+      }
+
+      resize() {
+        const rect = this.container.getBoundingClientRect();
+        if(rect.width === 0) return;
+        
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        
+        this.canvas.width = rect.width * dpr;
+        this.canvas.height = rect.height * dpr;
+        this.canvas.style.width = rect.width + 'px';
+        this.canvas.style.height = rect.height + 'px';
+        
+        this.overlay.width = rect.width * dpr;
+        this.overlay.height = rect.height * dpr;
+        this.overlay.style.width = rect.width + 'px';
+        this.overlay.style.height = rect.height + 'px';
+
+        this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+        this.ctx.scale(dpr, dpr);
+        this.octx.setTransform(1, 0, 0, 1, 0, 0);
+        this.octx.scale(dpr, dpr);
+        
+        this.width = rect.width;
+        this.height = rect.height;
+      }
+
+      setData(data, resolution) {
+        this.data = data;
+        this.dataResolution = resolution;
+        this.draw();
+      }
+
+      timeToX(timestamp) {
+        if (!this.data || this.data.length === 0) return 0;
+        const startTime = this.data[0].timestamp;
+        const endTime = this.data[this.data.length - 1].timestamp;
+        const duration = endTime - startTime;
+        if (duration === 0) return this.padding.left + (this.width - this.padding.left - this.padding.right) / 2;
+
+        const ratio = (timestamp - startTime) / duration;
+        
+        const chartW = this.width - this.padding.left - this.padding.right;
+        let x = ratio * chartW;
+        x *= this.zoomTransform.scale;
+        x += this.zoomTransform.offsetX;
+        
+        return x + this.padding.left;
+      }
+
+      xToTime(x) {
+        if (!this.data || this.data.length === 0) return 0;
+        const startTime = this.data[0].timestamp;
+        const endTime = this.data[this.data.length - 1].timestamp;
+        const duration = endTime - startTime;
+        
+        const chartW = this.width - this.padding.left - this.padding.right;
+        let rawX = x - this.padding.left;
+        rawX -= this.zoomTransform.offsetX;
+        rawX /= this.zoomTransform.scale;
+        
+        const ratio = rawX / chartW;
+        return startTime + (ratio * duration);
+      }
+
+      draw() {
+        const { ctx, width, height, data, padding } = this;
+        ctx.clearRect(0, 0, width, height);
+
+        if (data.length === 0) {
+          ctx.fillStyle = '#94a3b8'; 
+          ctx.font = '12px IBM Plex Sans';
+          ctx.textAlign = 'center';
+          ctx.fillText("No data available", width/2, height/2);
+          return;
         }
 
-        // ========== State ==========
-        let state = {
-            granularity: '5min', 
-            dataResolution: '5min', 
-            section: 'overview',
-            baseData: [],
-            analysis: { pointA: null, pointB: null },
-            zoomTransform: { scale: 1, offsetX: 0 },
-            isDragging: false,
-            lastMouseX: 0,
-            hoveredPoint: null
-        };
+        const chartW = width - padding.left - padding.right;
+        const chartH = height - padding.top - padding.bottom;
 
-        // REQUEST STATE FOR RACE CONDITION HANDLING
-        let fetchController = null;
-        let requestId = 0;
+        // Filter visible data
+        const visStartTime = this.xToTime(padding.left);
+        const visEndTime = this.xToTime(width - padding.right);
+        const buffer = (visEndTime - visStartTime) * 0.05; 
+        const visibleData = data.filter(d => d.timestamp >= (visStartTime - buffer) && d.timestamp <= (visEndTime + buffer));
 
-        // ========== Modal Logic ==========
-        function openModal(id) {
-            const modal = document.getElementById(id);
-            if(modal) modal.classList.add('visible');
+        if (visibleData.length === 0) return;
+
+        // Y Scale
+        const latencies = visibleData.map(d => d.latency);
+        const minL = Math.min(...latencies) * 0.9;
+        const maxL = Math.max(...latencies) * 1.1;
+        const rangeL = Math.max(maxL - minL, 1);
+        const calcY = (val) => padding.top + chartH - ((val - minL) / rangeL) * chartH;
+
+        this.drawDynamicTimeAxis(visibleData);
+
+        // Y Axis
+        ctx.fillStyle = '#94a3b8'; ctx.font = '10px IBM Plex Mono'; ctx.textAlign = 'right';
+        ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let i = 0; i <= 4; i++) {
+          const y = padding.top + (chartH * i / 4);
+          ctx.moveTo(padding.left, y);
+          ctx.lineTo(width - padding.right, y);
+          const val = Math.round(maxL - (rangeL * i / 4));
+          ctx.fillText(val + "ms", padding.left - 8, y + 3);
+        }
+        ctx.stroke();
+
+        // Data Drawing
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(padding.left, padding.top, chartW, chartH);
+        ctx.clip();
+
+        const isCoarseData = ['1day', '1week'].includes(this.dataResolution);
+
+        // Line
+        ctx.beginPath();
+        visibleData.forEach((d, i) => {
+          const x = this.timeToX(d.timestamp);
+          const y = calcY(d.latency);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.strokeStyle = this.lineColor;
+        ctx.lineWidth = isCoarseData ? 2 : 1.5;
+        ctx.stroke();
+
+        // Points
+        if (isCoarseData || visibleData.length < 200) {
+          ctx.fillStyle = this.lineColor;
+          visibleData.forEach(d => {
+            const x = this.timeToX(d.timestamp);
+            const y = calcY(d.latency);
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, Math.PI * 2); 
+            ctx.fill();
+          });
         }
 
-        function closeModal(id) {
-            const modal = document.getElementById(id);
-            if(modal) modal.classList.remove('visible');
+        ctx.restore();
+      }
+
+      drawDynamicTimeAxis(visibleData) {
+        const { ctx, width, height, data, padding } = this;
+        if (data.length === 0) return;
+        
+        const chartH = height - padding.top - padding.bottom;
+        const visStart = visibleData.length > 0 ? visibleData[0].timestamp : data[0].timestamp;
+        const visEnd = visibleData.length > 0 ? visibleData[visibleData.length-1].timestamp : data[data.length-1].timestamp;
+        const visDuration = visEnd - visStart;
+        
+        const chartW = width - padding.left - padding.right;
+        const minSpacing = 70; 
+        
+        const steps = [
+          { ms: 60000, unit: 'minute', step: 1 },
+          { ms: 300000, unit: 'minute', step: 5 },
+          { ms: 900000, unit: 'minute', step: 15 },
+          { ms: 3600000, unit: 'hour', step: 1 },
+          { ms: 10800000, unit: 'hour', step: 3 },
+          { ms: 21600000, unit: 'hour', step: 6 },
+          { ms: 43200000, unit: 'hour', step: 12 },
+          { ms: 86400000, unit: 'day', step: 1 },
+          { ms: 172800000, unit: 'day', step: 2 },
+          { ms: 604800000, unit: 'week', step: 1 }
+        ];
+
+        let minAllowedStepMs = 0;
+        if (this.dataResolution === '1day') minAllowedStepMs = 86400000; 
+        if (this.dataResolution === '1week') minAllowedStepMs = 604800000; 
+
+        const msPerPixel = visDuration / chartW;
+        const msNeeded = msPerPixel * minSpacing;
+
+        let chosenStep = steps[steps.length - 1];
+        for (let s of steps) {
+          if (s.ms >= msNeeded && s.ms >= minAllowedStepMs) {
+            chosenStep = s;
+            break;
+          }
         }
 
-        // Close modal on overlay click
-        document.querySelectorAll('.modal-overlay').forEach(modal => {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.classList.remove('visible');
-                }
-            });
+        const d = new Date(visStart);
+        if (chosenStep.unit === 'minute') d.setMinutes(Math.floor(d.getMinutes() / chosenStep.step) * chosenStep.step, 0, 0);
+        else if (chosenStep.unit === 'hour') d.setHours(Math.floor(d.getHours() / chosenStep.step) * chosenStep.step, 0, 0, 0);
+        else if (chosenStep.unit === 'day' || chosenStep.unit === 'week') d.setHours(0, 0, 0, 0);
+
+        let cursor = d.getTime();
+        
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(padding.left, padding.top, chartW, chartH + 30);
+        ctx.clip();
+
+        let safetyCounter = 0;
+        while (cursor < visEnd + chosenStep.ms && safetyCounter < 100) {
+          if (cursor >= visStart - chosenStep.ms) {
+            const x = this.timeToX(cursor);
+            
+            ctx.strokeStyle = '#e2e8f0'; 
+            ctx.beginPath();
+            ctx.moveTo(x, padding.top);
+            ctx.lineTo(x, padding.top + chartH + 5);
+            ctx.stroke();
+
+            const date = new Date(cursor);
+            let label = "";
+            ctx.fillStyle = '#94a3b8'; 
+            ctx.font = '10px "IBM Plex Sans"';
+            ctx.textAlign = 'center';
+
+            if (chosenStep.unit === 'minute' || chosenStep.unit === 'hour') {
+              label = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+              if (cursor === d.getTime() || date.getHours() === 0) label = date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + label;
+            } else {
+                 const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                 label = `${days[date.getDay()]} ${date.getDate()}`;
+                 if (date.getDate() === 1 || cursor === d.getTime()) {
+                     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                     label = `${months[date.getMonth()]} ${date.getDate()}`;
+                 }
+            }
+            ctx.fillText(label, x, padding.top + chartH + 18);
+          }
+          cursor += chosenStep.ms;
+          safetyCounter++;
+        }
+        ctx.restore();
+      }
+
+      drawOverlay() {
+        const { octx, width, height, data, hoveredPoint, padding, container } = this;
+        
+        // Size check
+        const rect = container.getBoundingClientRect();
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        if(this.overlay.width !== rect.width * dpr) this.resize();
+
+        octx.clearRect(0, 0, width, height);
+        
+        if (!hoveredPoint || data.length === 0) return;
+
+        const lats = data.map(d=>d.latency);
+        const minL = Math.min(...lats) * 0.9;
+        const maxL = Math.max(...lats) * 1.1;
+        const range = Math.max(maxL - minL, 1);
+        const chartH = height - padding.top - padding.bottom;
+        const calcY = (val) => padding.top + chartH - ((val - minL) / range) * chartH;
+
+        const p = hoveredPoint;
+        const y = calcY(p.data.latency);
+        const x = this.timeToX(p.data.timestamp);
+        
+        octx.beginPath();
+        octx.arc(x, y, 12, 0, Math.PI * 2);
+        octx.fillStyle = this.overlayColor;
+        octx.fill();
+        octx.beginPath();
+        octx.arc(x, y, 6, 0, Math.PI * 2);
+        octx.strokeStyle = this.lineColor;
+        octx.lineWidth = 2;
+        octx.stroke();
+      }
+
+      setupInteractions() {
+        const container = this.container;
+        
+        // Wheel Zoom
+        container.addEventListener('wheel', e => {
+          e.preventDefault();
+          const rect = container.getBoundingClientRect();
+          const mouseX = e.clientX - rect.left;
+          
+          const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+          const newScale = Math.max(1, Math.min(100, this.zoomTransform.scale * zoomFactor));
+          
+          const chartW = this.width - this.padding.left - this.padding.right;
+          const mouseVirtX = (mouseX - this.padding.left - this.zoomTransform.offsetX) / this.zoomTransform.scale;
+          
+          this.zoomTransform.scale = newScale;
+          this.zoomTransform.offsetX = mouseX - this.padding.left - (mouseVirtX * newScale);
+
+          if (newScale === 1) this.zoomTransform.offsetX = 0;
+
+          const maxOffset = 0;
+          const minOffset = -(chartW * (newScale - 1));
+          this.zoomTransform.offsetX = Math.min(maxOffset, Math.max(minOffset, this.zoomTransform.offsetX));
+
+          // Only update main UI indicators if this is the main chart
+          if (container.id === 'chart-main-container') {
+              document.getElementById('zoomLevel').textContent = newScale.toFixed(1) + 'x zoom';
+              document.getElementById('resetZoomBtn').classList.toggle('hidden', newScale === 1);
+          }
+          
+          this.draw();
+          this.drawOverlay();
+
+        }, { passive: false });
+
+        // Drag Start
+        container.addEventListener('mousedown', e => {
+          if (this.zoomTransform.scale > 1) {
+            this.isDragging = true;
+            this.lastMouseX = e.clientX;
+            container.style.cursor = 'grabbing';
+          }
         });
 
-        // ========== API & Data ==========
-        async function fetchSystemData(resolution) {
-            // RACE CONDITION FIX: Abort previous request
-            if (fetchController) {
-                fetchController.abort();
-            }
-            fetchController = new AbortController();
-            const currentRequestId = ++requestId;
-            const signal = fetchController.signal;
+        // Window listeners for Drag and Hover
+        // We attach to window to handle dragging outside the element
+        window.addEventListener('mousemove', e => {
+          // Dragging Logic
+          if (this.isDragging) {
+            const dx = e.clientX - this.lastMouseX;
+            this.lastMouseX = e.clientX;
+            this.zoomTransform.offsetX += dx;
 
-            // Immediate UI Reset
-            state.baseData = [];
-            state.dataResolution = resolution; 
-            updateResolutionButtons(resolution);
-            setUIStatus('WORKING ON IT...', 'loading');
+            const chartW = this.width - this.padding.left - this.padding.right;
+            const maxOffset = 0;
+            const minOffset = -(chartW * (this.zoomTransform.scale - 1));
+            this.zoomTransform.offsetX = Math.min(maxOffset, Math.max(minOffset, this.zoomTransform.offsetX));
+
+            this.draw();
+            this.drawOverlay();
+            return;
+          }
+          
+          // Hover Logic - STRICT BOUNDS CHECK
+          const rect = container.getBoundingClientRect();
+          const isInside = (e.clientX >= rect.left && e.clientX <= rect.right && 
+                            e.clientY >= rect.top && e.clientY <= rect.bottom);
+          
+          if (!isInside) {
+              // If we were hovering, clear it
+              if (this.hoveredPoint) {
+                  this.hoveredPoint = null;
+                  tooltipEl.classList.remove('visible');
+                  this.drawOverlay();
+              }
+              container.style.cursor = 'crosshair';
+              return;
+          }
+
+          // Process Hover
+          const mouseX = e.clientX - rect.left;
+          const hoverTime = this.xToTime(mouseX);
+          
+          let closest = null;
+          let minDist = 30; 
+
+          this.data.forEach((d, i) => {
+            const x = this.timeToX(d.timestamp);
+            const dist = Math.abs(x - mouseX);
+            if (dist < minDist) {
+              minDist = dist;
+              closest = { x, index: i, data: d };
+            }
+          });
+          
+          this.hoveredPoint = closest;
+          
+          if (closest) {
+            tooltipEl.classList.add('visible');
+            tooltipEl.style.left = (e.clientX + 15) + 'px';
+            tooltipEl.style.top = (e.clientY - 30) + 'px';
+            document.getElementById('tooltip-time').textContent = new Date(closest.data.timestamp).toLocaleString();
+            document.getElementById('tooltip-value').textContent = closest.data.latency.toFixed(2) + ' ms';
             
-            // Reset Zoom immediately for new view
-            state.zoomTransform = { scale: 1, offsetX: 0 };
-            document.getElementById('zoomLevel').textContent = '1x zoom';
-            document.getElementById('resetZoomBtn').classList.add('hidden');
+            container.style.cursor = 'crosshair';
+          } else {
+            tooltipEl.classList.remove('visible');
+            container.style.cursor = this.zoomTransform.scale > 1 ? 'grab' : 'crosshair';
+          }
+          
+          this.drawOverlay();
+        });
 
-            // Clear Canvas immediately to show responsiveness
-            if (mainChart) mainChart.draw();
-
-            try {
-                const url = `${API_BASE}/system/resolution?resolution=${resolution}`;
-                const response = await fetch(url, { signal });
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const json = await response.json();
-                
-                // Double check if this request is still the relevant one
-                if (currentRequestId !== requestId) return;
-
-                // Map & Sort
-                let mappedData = json.data.map(item => ({
-                    timestamp: new Date(item.TIME).getTime(),
-                    latency: item.VALUE || 0, 
-                    activeRoutes: item.WORKLOAD,
-                    efficiency: item.VALUE_WORKLOAD
-                }));
-                
-                mappedData.sort((a, b) => a.timestamp - b.timestamp);
-
-                console.log(`Request ${currentRequestId}: Loaded ${mappedData.length} points for ${resolution}`);
-
-                state.baseData = mappedData;
-                // Use resolution from JSON if provided, else fallback
-                state.dataResolution = json.resolution || resolution;
-                
-                setUIStatus('LIVE', 'success');
-                
-                // Only update view if this request is the current one
-                if (currentRequestId === requestId) {
-                    updateView();
-                }
-                
-            } catch (err) {
-                if (err.name === 'AbortError') {
-                    console.log("Request aborted due to new selection.");
-                    return;
-                }
-                console.error("API Error:", err);
-                setUIStatus('CONNECTION ERROR', 'error');
-                state.baseData = [];
-                if (currentRequestId === requestId) updateView();
-            } finally {
-                fetchController = null;
-            }
-        }
-
-        function updateResolutionButtons(res) {
-            document.querySelectorAll('[data-granularity]').forEach(btn => {
-                btn.classList.remove('active');
-                if(btn.dataset.granularity === res) {
-                    btn.classList.add('active');
-                }
-            });
-        }
-
-        function setUIStatus(text, type) {
-            const dot = document.getElementById('statusDot');
-            const textEl = document.getElementById('statusText');
-            const overlay = document.getElementById('loadingOverlay');
-            textEl.textContent = text;
-            if (type === 'loading') {
-                dot.className = "w-2 h-2 rounded-full bg-[var(--tertiary)] loading-pulse";
-                if (overlay) overlay.classList.remove('hidden');
-            } else {
-                dot.className = `w-2 h-2 rounded-full`;
-                dot.style.backgroundColor = type === 'success' ? 'var(--accent)' : 'var(--danger)';
-                if (overlay) overlay.classList.add('hidden');
-            }
-        }
+        // Drag End / Mouse Leave
+        const handleMouseUp = () => {
+          if (this.isDragging) {
+            this.isDragging = false;
+            container.style.cursor = 'crosshair';
+          }
+        };
         
-        function updateStats(data) {
-            if (!data || data.length === 0) return;
-            const latencies = data.map(d => d.latency).filter(v => v != null);
-            if (latencies.length === 0) return;
-            const mean = latencies.reduce((a, b) => a + b, 0) / latencies.length;
-            const variance = latencies.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / latencies.length;
-            const stdDev = Math.sqrt(variance);
-            
-            document.getElementById('statMean').innerHTML = formatLatency(mean);
-            document.getElementById('statEfficiency').textContent = (data.reduce((a,b) => a + (b.efficiency||0), 0) / data.length).toFixed(2);
-            document.getElementById('statAnomaly').innerHTML = formatLatency(stdDev) + " σ";
+        container.addEventListener('mouseleave', () => {
+            if (this.hoveredPoint) {
+                this.hoveredPoint = null;
+                tooltipEl.classList.remove('visible');
+                this.drawOverlay();
+            }
+        });
+
+        window.addEventListener('mouseup', handleMouseUp);
+      }
+    }
+
+    // ========================================
+    // Chart Instances
+    // ========================================
+    let mainChart = null;
+    let deviationChart = null;
+
+    // ========================================
+    // Data Loading Logic
+    // ========================================
+    async function loadLatencyDeviationData() {
+      const resolution = resolutionSelect.value;
+      const url = `${API_BASE_URL}/system/resolution?resolution=${resolution}`;
+
+      setStatus('Loading...', 'warning');
+      if(loadingOverlay) loadingOverlay.classList.remove('hidden');
+
+      // Reset Zoom
+      if(mainChart) mainChart.zoomTransform = { scale: 1, offsetX: 0 };
+      if(deviationChart) deviationChart.zoomTransform = { scale: 1, offsetX: 0 };
+      
+      document.getElementById('zoomLevel').textContent = '1x zoom';
+      document.getElementById('resetZoomBtn').classList.add('hidden');
+
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const result = await response.json();
+        currentData = result;
+        
+        if (result.data && result.data.length > 0) {
+          // Map data
+          const mappedData = result.data.map(item => ({
+              timestamp: new Date(item.TIME).getTime(),
+              latency: item.VALUE || 0, 
+              activeRoutes: item.WORKLOAD,
+              efficiency: item.VALUE_WORKLOAD
+          })).sort((a, b) => a.timestamp - b.timestamp);
+
+          // Update Main Chart
+          if (mainChart) mainChart.setData(mappedData, resolution);
+          
+          // Update Deviation Chart (using same data as per prompt: "data from system/resolution is of latency deviation")
+          if (deviationChart) deviationChart.setData(mappedData, resolution);
+          
+          // Update Workload Chart (SVG)
+          renderLineChart('chart-workload-container', result.data, 'TIME', 'WORKLOAD', 'var(--warning)');
+          
+          updateMetrics(result.data);
+          setStatus('Ready', 'success');
+        } else {
+          if (mainChart) mainChart.setData([], resolution);
+          if (deviationChart) deviationChart.setData([], resolution);
+          setStatus('No Data', 'warning');
         }
 
-        // ========== Chart Classes ==========
-        class ZoomableChart {
-            constructor(canvasId, overlayId) {
-                this.canvas = document.getElementById(canvasId);
-                this.overlay = document.getElementById(overlayId);
-                if (!this.canvas) return;
-                
-                this.ctx = this.canvas.getContext('2d');
-                this.octx = this.overlay ? this.overlay.getContext('2d') : null;
-                
-                this.padding = { top: 20, right: 20, bottom: 40, left: 50 };
-                this.data = [];
-                
-                this.resize();
-                this.setupInteractions();
-            }
+      } catch (error) {
+        console.error("Could not load data:", error);
+        if (mainChart) mainChart.setData([], resolution);
+        if (deviationChart) deviationChart.setData([], resolution);
+        setStatus('Error', 'danger');
+      } finally {
+          if(loadingOverlay) loadingOverlay.classList.add('hidden');
+      }
+    }
 
-            resize() {
-                const container = this.canvas.parentElement;
-                if (!container) return;
-                const dpr = Math.min(window.devicePixelRatio || 1, 2);
-                const rect = container.getBoundingClientRect();
-                
-                this.canvas.width = rect.width * dpr;
-                this.canvas.height = rect.height * dpr;
-                this.canvas.style.width = rect.width + 'px';
-                this.canvas.style.height = rect.height + 'px';
-                
-                if (this.overlay) {
-                    this.overlay.width = rect.width * dpr;
-                    this.overlay.height = rect.height * dpr;
-                    this.overlay.style.width = rect.width + 'px';
-                    this.overlay.style.height = rect.height + 'px';
-                }
+    function setStatus(text, type) {
+      const indicator = document.getElementById('statusIndicator');
+      const statusText = document.getElementById('statusText');
+      statusText.innerText = text;
 
-                this.ctx.setTransform(1, 0, 0, 1, 0, 0);
-                this.ctx.scale(dpr, dpr);
-                if (this.octx) {
-                    this.octx.setTransform(1, 0, 0, 1, 0, 0);
-                    this.octx.scale(dpr, dpr);
-                }
-                
-                this.width = rect.width;
-                this.height = rect.height;
-            }
+      indicator.className = 'w-2 h-2 rounded-full';
+      statusText.className = 'text-xs font-medium';
 
-            setData(data) {
-                this.data = data;
-                updateStats(data);
-                this.draw();
-            }
+      if (type === 'success') {
+        indicator.classList.add('bg-[var(--success)]');
+        statusText.classList.add('text-[var(--success)]');
+      } else if (type === 'warning') {
+        indicator.classList.add('bg-[var(--warning)]');
+        statusText.classList.add('text-[var(--warning)]');
+      } else if (type === 'danger') {
+        indicator.classList.add('bg-[var(--danger)]');
+        statusText.classList.add('text-[var(--danger)]');
+      }
+    }
 
-            timeToX(timestamp) {
-                if (!this.data || this.data.length === 0) return 0;
-                const startTime = this.data[0].timestamp;
-                const endTime = this.data[this.data.length - 1].timestamp;
-                const duration = endTime - startTime;
-                if (duration === 0) return this.padding.left + (this.width - this.padding.left - this.padding.right) / 2;
+    function updateMetrics(data) {
+      const values = data.map(d => d.VALUE).sort((a,b) => a-b);
+      const workloads = data.map(d => d.WORKLOAD);
+      
+      const p50 = values[Math.floor(values.length * 0.5)] || 0;
+      const p95 = values[Math.floor(values.length * 0.95)] || 0;
+      const p99 = values[Math.floor(values.length * 0.99)] || 0;
+      const avgWorkload = (workloads.reduce((a,b)=>a+b, 0) / workloads.length).toFixed(1);
 
-                const ratio = (timestamp - startTime) / duration;
-                
-                const chartW = this.width - this.padding.left - this.padding.right;
-                let x = ratio * chartW;
-                x *= state.zoomTransform.scale;
-                x += state.zoomTransform.offsetX;
-                
-                return x + this.padding.left;
-            }
+      document.getElementById('metric-p50').innerText = p50;
+      document.getElementById('metric-p95').innerText = p95;
+      document.getElementById('metric-p99').innerText = p99;
+      document.getElementById('metric-volume').innerText = avgWorkload;
+    }
 
-            xToTime(x) {
-                if (!this.data || this.data.length === 0) return 0;
-                const startTime = this.data[0].timestamp;
-                const endTime = this.data[this.data.length - 1].timestamp;
-                const duration = endTime - startTime;
-                
-                const chartW = this.width - this.padding.left - this.padding.right;
-                let rawX = x - this.padding.left;
-                rawX -= state.zoomTransform.offsetX;
-                rawX /= state.zoomTransform.scale;
-                
-                const ratio = rawX / chartW;
-                return startTime + (ratio * duration);
-            }
+    // ========================================
+    // Simple SVG Renderer (For Workload)
+    // ========================================
+    function renderLineChart(containerId, data, xKey, yKey, color) {
+      const container = document.getElementById(containerId);
+      if (!container || data.length === 0) return;
 
-            draw() {
-                const { ctx, width, height, data, padding } = this;
-                ctx.clearRect(0, 0, width, height);
+      container.innerHTML = '';
 
-                if (data.length === 0) {
-                    ctx.fillStyle = '#5a6b82';
-                    ctx.font = '12px Space Grotesk';
-                    ctx.textAlign = 'center';
-                    ctx.fillText("No data available or loading...", width/2, height/2);
-                    return;
-                }
+      const width = container.clientWidth || 600;
+      const height = 200;
+      const padding = 20;
 
-                const chartW = width - padding.left - padding.right;
-                const chartH = height - padding.top - padding.bottom;
+      const vals = data.map(d => d[yKey]);
+      const minVal = Math.min(...vals);
+      const maxVal = Math.max(...vals);
+      const range = maxVal - minVal || 1;
 
-                const visStartTime = this.xToTime(padding.left);
-                const visEndTime = this.xToTime(width - padding.right);
-                
-                const buffer = (visEndTime - visStartTime) * 0.05; 
-                const visibleData = data.filter(d => d.timestamp >= (visStartTime - buffer) && d.timestamp <= (visEndTime + buffer));
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("width", "100%");
+      svg.setAttribute("height", height);
+      svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+      svg.style.overflow = "visible";
 
-                if (visibleData.length === 0) return;
+      for (let i = 0; i <= 4; i++) {
+        const y = padding + (i * (height - 2 * padding) / 4);
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute("x1", padding);
+        line.setAttribute("y1", y);
+        line.setAttribute("x2", width - padding);
+        line.setAttribute("y2", y);
+        line.setAttribute("stroke", "var(--border)");
+        line.setAttribute("stroke-width", "1");
+        svg.appendChild(line);
+      }
 
-                const latencies = visibleData.map(d => d.latency);
-                const minL = Math.min(...latencies) * 0.9;
-                const maxL = Math.max(...latencies) * 1.1;
-                const rangeL = Math.max(maxL - minL, 1);
-                
-                const calcY = (val) => padding.top + chartH - ((val - minL) / rangeL) * chartH;
+      const points = data.map((d, i) => {
+        const x = padding + (i / (data.length - 1)) * (width - 2 * padding);
+        const y = height - padding - ((d[yKey] - minVal) / range) * (height - 2 * padding);
+        return `${x},${y}`;
+      }).join(' ');
 
-                this.drawDynamicTimeAxis(visibleData, state.dataResolution);
+      const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+      polyline.setAttribute("points", points);
+      polyline.setAttribute("fill", "none");
+      polyline.setAttribute("stroke", color);
+      polyline.setAttribute("stroke-width", "2");
+      svg.appendChild(polyline);
 
-                // Y Axis
-                ctx.fillStyle = '#5a6b82'; ctx.font = '10px IBM Plex Mono'; ctx.textAlign = 'right';
-                ctx.strokeStyle = 'rgba(90, 107, 130, 0.08)'; ctx.lineWidth = 1;
-                ctx.beginPath();
-                for (let i = 0; i <= 4; i++) {
-                    const y = padding.top + (chartH * i / 4);
-                    ctx.moveTo(padding.left, y);
-                    ctx.lineTo(width - padding.right, y);
-                    const val = Math.round(maxL - (rangeL * i / 4));
-                    ctx.fillText(val + "ms", padding.left - 8, y + 3);
-                }
-                ctx.stroke();
+      const areaPath = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+      const areaPoints = `${padding},${height - padding} ${points} ${width - padding},${height - padding}`;
+      areaPath.setAttribute("points", areaPoints);
+      areaPath.setAttribute("fill", color);
+      areaPath.setAttribute("opacity", "0.1");
+      svg.appendChild(areaPath);
 
-                // Data Drawing
-                ctx.save();
-                ctx.beginPath();
-                ctx.rect(padding.left, padding.top, chartW, chartH);
-                ctx.clip();
+      container.appendChild(svg);
+    }
 
-                // Determine if data is Coarse based on RESOLUTION metadata
-                const isCoarseData = ['1day', '1week'].includes(state.dataResolution);
+    // ========================================
+    // View Navigation
+    // ========================================
+    function switchView(viewName) {
+      const index = VIEWS.indexOf(viewName);
+      if (index !== -1) currentViewIndex = index;
+      
+      tabs.forEach((tab, i) => tab.classList.toggle('active', i === currentViewIndex));
+      viewPanels.forEach((p, i) => p.classList.toggle('active', i === currentViewIndex));
+      
+      // Resize charts when switching to their view
+      setTimeout(() => {
+          if (viewName === 'latency') {
+              if(mainChart) { mainChart.resize(); mainChart.draw(); }
+              if(deviationChart) { deviationChart.resize(); deviationChart.draw(); }
+          }
+      }, 0);
+    }
 
-                // 1. THE LINE
-                ctx.beginPath();
-                visibleData.forEach((d, i) => {
-                    const x = this.timeToX(d.timestamp);
-                    const y = calcY(d.latency);
-                    if (i === 0) ctx.moveTo(x, y);
-                    else ctx.lineTo(x, y);
-                });
-                ctx.strokeStyle = '#00c896';
-                ctx.lineWidth = isCoarseData ? 2 : 1.5;
-                ctx.stroke();
+    tabs.forEach((tab, i) => tab.addEventListener('click', () => {
+      currentViewIndex = i;
+      switchView(VIEWS[i]);
+    }));
 
-                // 2. THE POINTS (Only for Coarse Data or very few points)
-                if (isCoarseData || visibleData.length < 200) {
-                    ctx.fillStyle = '#00c896';
-                    visibleData.forEach(d => {
-                        const x = this.timeToX(d.timestamp);
-                        const y = calcY(d.latency);
-                        ctx.beginPath();
-                        ctx.arc(x, y, 4, 0, Math.PI * 2); 
-                        ctx.fill();
-                    });
-                }
+    scopeChips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        scopeChips.forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+      });
+    });
 
-                ctx.restore();
-            }
+    // ========================================
+    // Docs/Modal Logic
+    // ========================================
+    function toggleDropdown() {
+      const isOpen = dropdownMenu.classList.contains('active');
+      closeDropdowns();
+      if (!isOpen) {
+        dropdownMenu.classList.add('active');
+        toolboxBtn.setAttribute('aria-expanded', 'true');
+      }
+    }
+    function closeDropdowns() {
+      dropdownMenu.classList.remove('active');
+      toolboxBtn.setAttribute('aria-expanded', 'false');
+    }
+    
+    toolboxBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleDropdown(); });
+    document.addEventListener('click', (e) => {
+      if (!dropdownMenu.contains(e.target) && !toolboxBtn.contains(e.target)) closeDropdowns();
+    });
 
-            drawDynamicTimeAxis(visibleData, resolution) {
-                const { ctx, width, height, data, padding } = this;
-                if (data.length === 0) return;
-                
-                const chartH = height - padding.top - padding.bottom;
-                const visStart = visibleData.length > 0 ? visibleData[0].timestamp : data[0].timestamp;
-                const visEnd = visibleData.length > 0 ? visibleData[visibleData.length-1].timestamp : data[data.length-1].timestamp;
-                const visDuration = visEnd - visStart;
-                
-                const chartW = width - padding.left - padding.right;
-                const minSpacing = 70; 
-                
-                const steps = [
-                    { ms: 60000, unit: 'minute', step: 1 },
-                    { ms: 300000, unit: 'minute', step: 5 },
-                    { ms: 900000, unit: 'minute', step: 15 },
-                    { ms: 3600000, unit: 'hour', step: 1 },
-                    { ms: 10800000, unit: 'hour', step: 3 },
-                    { ms: 21600000, unit: 'hour', step: 6 },
-                    { ms: 43200000, unit: 'hour', step: 12 },
-                    { ms: 86400000, unit: 'day', step: 1 },
-                    { ms: 172800000, unit: 'day', step: 2 },
-                    { ms: 604800000, unit: 'week', step: 1 }
-                ];
+    function openHelpModal() { helpModal.classList.add('active'); }
+    function closeHelpModal() { helpModal.classList.remove('active'); }
+    function openDocModal() { docModal.classList.add('active'); }
+    function closeDocModal() { docModal.classList.remove('active'); }
+    
+    function triggerExport() { 
+      if (currentData) {
+        const blob = new Blob([JSON.stringify(currentData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `system-data-${resolutionSelect.value}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        alert("No data loaded to export.");
+      }
+    }
 
-                let minAllowedStepMs = 0;
-                if (resolution === '1day') minAllowedStepMs = 86400000; 
-                if (resolution === '1week') minAllowedStepMs = 604800000; 
+    helpModal.addEventListener('click', (e) => { if (e.target === helpModal) closeHelpModal(); });
+    docModal.addEventListener('click', (e) => { if (e.target === docModal) closeDocModal(); });
 
-                const msPerPixel = visDuration / chartW;
-                const msNeeded = msPerPixel * minSpacing;
+    // ========================================
+    // Render Tables
+    // ========================================
+    function renderRouteTable() {
+      const tbody = document.getElementById('routeTable');
+      if (!tbody) return;
+      let html = '';
+      ROUTES.forEach(route => {
+        html += `<tr>
+            <td class="font-medium">${route}</td>
+            <td class="text-right text-[var(--fg-muted)]">-- ms</td>
+            <td class="text-right text-[var(--warning)]">-- ms</td>
+            <td class="text-right text-[var(--fg-muted)]">--%</td>
+            <td class="text-right"><span class="px-2 py-0.5 rounded bg-[var(--bg)] text-[var(--fg-muted)]">--</span></td>
+        </tr>`;
+      });
+      tbody.innerHTML = html;
+    }
 
-                let chosenStep = steps[steps.length - 1];
-                for (let s of steps) {
-                    if (s.ms >= msNeeded && s.ms >= minAllowedStepMs) {
-                        chosenStep = s;
-                        break;
-                    }
-                }
+    function renderMatrixTable() {
+      const table = document.getElementById('matrixTable');
+      if (!table) return;
+      let html = '<thead><tr><th>Route</th>';
+      LATENT_RESOURCES.forEach((r, i) => { html += `<th class="text-center">R${i + 1}</th>`; });
+      html += '</tr></thead><tbody>';
+      ROUTES.forEach(route => {
+        html += `<tr><td class="font-medium">${route}</td>`;
+        LATENT_RESOURCES.forEach(() => {
+          html += `<td class="text-center"><div class="w-8 h-8 mx-auto rounded bg-[var(--bg)] border border-[var(--border)] flex items-center justify-center text-xs text-[var(--fg-muted)]">--</div></td>`;
+        });
+        html += '</tr>';
+      });
+      html += '</tbody>';
+      table.innerHTML = html;
+    }
 
-                const d = new Date(visStart);
-                if (chosenStep.unit === 'minute') d.setMinutes(Math.floor(d.getMinutes() / chosenStep.step) * chosenStep.step, 0, 0);
-                else if (chosenStep.unit === 'hour') d.setHours(Math.floor(d.getHours() / chosenStep.step) * chosenStep.step, 0, 0, 0);
-                else if (chosenStep.unit === 'day' || chosenStep.unit === 'week') d.setHours(0, 0, 0, 0);
+    function renderLatentResources() {
+      const container = document.getElementById('latentResources');
+      if (!container) return;
+      let html = '';
+      LATENT_RESOURCES.forEach((r, i) => {
+        html += `<div class="p-3 rounded-lg bg-[var(--bg)] border border-[var(--border)]">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm text-[var(--fg-secondary)]">${r.name}</span>
+            <span class="text-xs font-mono text-[var(--fg-muted)]">R${i + 1}</span>
+          </div>
+          <div class="h-1.5 rounded-full bg-[var(--border)]">
+            <div class="h-full rounded-full bg-[var(--accent)]" style="width: 0%"></div>
+          </div>
+        </div>`;
+      });
+      container.innerHTML = html;
+    }
 
-                let cursor = d.getTime();
-                
-                ctx.save();
-                ctx.beginPath();
-                ctx.rect(padding.left, padding.top, chartW, chartH + 30);
-                ctx.clip();
+    // ========================================
+    // Keyboard Navigation
+    // ========================================
+    let lastKey = '', lastTime = 0;
+    const COMBO_THRESHOLD = 400; 
 
-                let safetyCounter = 0;
-                while (cursor < visEnd + chosenStep.ms && safetyCounter < 100) {
-                    if (cursor >= visStart - chosenStep.ms) {
-                        const x = this.timeToX(cursor);
-                        
-                        ctx.strokeStyle = 'rgba(90, 107, 130, 0.15)';
-                        ctx.beginPath();
-                        ctx.moveTo(x, padding.top);
-                        ctx.lineTo(x, padding.top + chartH + 5);
-                        ctx.stroke();
+    document.addEventListener('keydown', (e) => {
+      const key = e.key.toLowerCase();
+      const now = Date.now();
+      const isCombo = (now - lastTime) < COMBO_THRESHOLD;
 
-                        const date = new Date(cursor);
-                        let label = "";
-                        ctx.fillStyle = '#5a6b82';
-                        ctx.font = '10px "Space Grotesk"';
-                        ctx.textAlign = 'center';
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
 
-                        if (chosenStep.unit === 'minute' || chosenStep.unit === 'hour') {
-                            label = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-                            if (cursor === d.getTime() || date.getHours() === 0) label = date.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + label;
-                        } else {
-                             const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-                             label = `${days[date.getDay()]} ${date.getDate()}`;
-                             if (date.getDate() === 1 || cursor === d.getTime()) {
-                                 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                                 label = `${months[date.getMonth()]} ${date.getDate()}`;
-                             }
-                        }
-                        ctx.fillText(label, x, padding.top + chartH + 18);
-                    }
-                    cursor += chosenStep.ms;
-                    safetyCounter++;
-                }
-                ctx.restore();
-            }
+      if (key === 'escape') { closeHelpModal(); closeDocModal(); closeDropdowns(); return; }
+      if (key === 'f1') { e.preventDefault(); openHelpModal(); return; }
+      if (key === '?') { e.preventDefault(); toggleDropdown(); return; }
+      if (key === 'r' && !isCombo) { loadLatencyDeviationData(); return; }
+      
+      if (['1','2','3','4','5','6'].includes(key)) { e.preventDefault(); switchView(VIEWS[parseInt(key)-1]); return; }
+      if (key === 'arrowright') { currentViewIndex = (currentViewIndex + 1) % VIEWS.length; switchView(VIEWS[currentViewIndex]); return; }
+      if (key === 'arrowleft') { currentViewIndex = (currentViewIndex - 1 + VIEWS.length) % VIEWS.length; switchView(VIEWS[currentViewIndex]); return; }
 
-            setupInteractions() {
-                const container = this.canvas.parentElement;
-                
-                container.addEventListener('wheel', e => {
-                    e.preventDefault();
-                    const rect = container.getBoundingClientRect();
-                    const mouseX = e.clientX - rect.left;
-                    
-                    const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-                    const newScale = Math.max(1, Math.min(100, state.zoomTransform.scale * zoomFactor));
-                    
-                    const chartW = this.width - this.padding.left - this.padding.right;
-                    const mouseVirtX = (mouseX - this.padding.left - state.zoomTransform.offsetX) / state.zoomTransform.scale;
-                    
-                    state.zoomTransform.scale = newScale;
-                    state.zoomTransform.offsetX = mouseX - this.padding.left - (mouseVirtX * newScale);
+      if (isCombo && lastKey === 'g') {
+        if (key === 'l') { switchView('latency'); }
+        if (key === 'd') { switchView('distribution'); }
+        if (key === 'w') { switchView('workload'); }
+        if (key === 'x') { switchView('decomposition'); }
+        if (key === 'm') { switchView('matrix'); }
+        if (key === 'e') { switchView('elasticity'); }
+        lastKey = '';
+        return;
+      }
 
-                    if (newScale === 1) state.zoomTransform.offsetX = 0;
+      if ((e.ctrlKey || e.metaKey) && key === 'e') { e.preventDefault(); triggerExport(); return; }
 
-                    const maxOffset = 0;
-                    const minOffset = -(chartW * (newScale - 1));
-                    state.zoomTransform.offsetX = Math.min(maxOffset, Math.max(minOffset, state.zoomTransform.offsetX));
+      lastKey = key;
+      lastTime = now;
+    });
 
-                    document.getElementById('zoomLevel').textContent = newScale.toFixed(1) + 'x zoom';
-                    document.getElementById('resetZoomBtn').classList.toggle('hidden', newScale === 1);
-                    
-                    this.draw();
-                    drawOverlay();
+    // ========================================
+    // Initialize
+    // ========================================
+    document.addEventListener('DOMContentLoaded', () => {
+      renderRouteTable();
+      renderMatrixTable();
+      renderLatentResources();
+      
+      // Initialize Charts
+      mainChart = new ZoomableChart('chart-main-container', { 
+          lineColor: '#0891b2', 
+          overlayColor: 'rgba(8, 145, 178, 0.1)' 
+      });
 
-                }, { passive: false });
+      deviationChart = new ZoomableChart('chart-deviation-container', { 
+          lineColor: '#0891b2', 
+          overlayColor: 'rgba(8, 145, 178, 0.1)' 
+      });
 
-                container.addEventListener('mousedown', e => {
-                    if (state.zoomTransform.scale > 1) {
-                        state.isDragging = true;
-                        state.lastMouseX = e.clientX;
-                        container.style.cursor = 'grabbing';
-                    }
-                });
+      // Reset Zoom Button (Linked to Main Chart)
+      document.getElementById('resetZoomBtn').addEventListener('click', () => {
+          if (mainChart) {
+              mainChart.zoomTransform = { scale: 1, offsetX: 0 };
+              document.getElementById('zoomLevel').textContent = '1x zoom';
+              document.getElementById('resetZoomBtn').classList.add('hidden');
+              mainChart.draw();
+              mainChart.drawOverlay();
+          }
+      });
 
-                window.addEventListener('mousemove', e => {
-                    if (state.isDragging) {
-                        const dx = e.clientX - state.lastMouseX;
-                        state.lastMouseX = e.clientX;
-                        state.zoomTransform.offsetX += dx;
-
-                        const chartW = this.width - this.padding.left - this.padding.right;
-                        const maxOffset = 0;
-                        const minOffset = -(chartW * (state.zoomTransform.scale - 1));
-                        state.zoomTransform.offsetX = Math.min(maxOffset, Math.max(minOffset, state.zoomTransform.offsetX));
-
-                        this.draw();
-                        drawOverlay();
-                        return;
-                    }
-                    
-                    const rect = container.getBoundingClientRect();
-                    const mouseX = e.clientX - rect.left;
-                    const hoverTime = this.xToTime(mouseX);
-                    
-                    let closest = null;
-                    let minDist = 30; 
-
-                    this.data.forEach((d, i) => {
-                        const x = this.timeToX(d.timestamp);
-                        const dist = Math.abs(x - mouseX);
-                        if (dist < minDist) {
-                            minDist = dist;
-                            closest = { x, index: i, data: d };
-                        }
-                    });
-                    
-                    state.hoveredPoint = closest;
-                    const tooltip = document.getElementById('tooltip');
-                    
-                    if (closest) {
-                        tooltip.classList.add('visible');
-                        tooltip.style.left = (e.clientX + 15) + 'px';
-                        tooltip.style.top = (e.clientY - 30) + 'px';
-                        document.getElementById('tooltip-time').textContent = new Date(closest.data.timestamp).toLocaleString();
-                        document.getElementById('tooltip-value').innerHTML = formatLatency(closest.data.latency);
-                        
-                        container.style.cursor = 'crosshair';
-                    } else {
-                        tooltip.classList.remove('visible');
-                        container.style.cursor = state.zoomTransform.scale > 1 ? 'grab' : 'crosshair';
-                    }
-                    
-                    drawOverlay();
-                });
-
-                window.addEventListener('mouseup', () => {
-                    if (state.isDragging) {
-                        state.isDragging = false;
-                        container.style.cursor = 'crosshair';
-                    }
-                });
-                
-                container.addEventListener('click', e => {
-                    if (state.hoveredPoint) handleChartClick(state.hoveredPoint);
-                });
-            }
-        }
-
-        // ===== Placeholder Charts =====
-        class DualAxisChart {
-            constructor(id) {
-                this.canvas = document.getElementById(id);
-                if(!this.canvas) return;
-                this.ctx = this.canvas.getContext('2d');
-                this.data = [];
-                this.resize();
-            }
-            resize() {
-                 if(!this.canvas) return;
-                 const container = this.canvas.parentElement;
-                 const dpr = window.devicePixelRatio || 1;
-                 this.canvas.width = container.clientWidth * dpr;
-                 this.canvas.height = container.clientHeight * dpr;
-                 this.canvas.style.width = container.clientWidth + 'px';
-                 this.canvas.style.height = container.clientHeight + 'px';
-                 this.ctx.scale(dpr, dpr);
-                 this.width = container.clientWidth;
-                 this.height = container.clientHeight;
-            }
-            setData(d) { this.data = d; this.draw(); }
-            draw() {
-                if(!this.ctx) return;
-                this.ctx.clearRect(0,0,this.width, this.height);
-                this.ctx.fillStyle = '#5a6b82';
-                this.ctx.font = '12px Space Grotesk';
-                this.ctx.fillText('Behavior metrics visualization', 20, 30);
-            }
-        }
-        class Histogram {
-            constructor(id) {
-                this.canvas = document.getElementById(id);
-                if(!this.canvas) return;
-                this.ctx = this.canvas.getContext('2d');
-                this.resize();
-            }
-            resize() { 
-                if(!this.canvas) return;
-                const container = this.canvas.parentElement;
-                const dpr = window.devicePixelRatio || 1;
-                this.canvas.width = container.clientWidth * dpr;
-                this.canvas.height = container.clientHeight * dpr;
-                this.canvas.style.width = container.clientWidth + 'px';
-                this.canvas.style.height = container.clientHeight + 'px';
-                this.ctx.scale(dpr, dpr);
-                this.width = container.clientWidth;
-                this.height = container.clientHeight;
-            }
-            setData(d) { this.data = d; this.draw(); }
-            draw() {
-                if(!this.ctx) return;
-                this.ctx.clearRect(0,0,this.width, this.height);
-                this.ctx.fillStyle = '#5a6b82';
-                this.ctx.font = '12px Space Grotesk';
-                this.ctx.fillText('Latency distribution histogram', 20, 30);
-            }
-        }
-
-        // ========== Logic & Init ==========
-        let mainChart = null, behaviorChart = null, latencyHist = null;
-
-        function initCharts() {
-            mainChart = new ZoomableChart('mainChart', 'mainChartOverlay');
-            behaviorChart = new DualAxisChart('behaviorChart');
-            latencyHist = new Histogram('latencyHist');
-            setupEvents();
-            loadInitialData();
-        }
-
-        async function loadInitialData() {
-            const resolution = GRANULARITY_MAP[state.granularity];
-            await fetchSystemData(resolution);
-        }
-
-        function updateView() {
-            if (mainChart) mainChart.setData(state.baseData);
-            updateSection();
-        }
-
-        function updateSection() {
-            if (state.section === 'overview') { drawOverlay(); updateAnalysisUI(); }
-            else if (state.section === 'behavior') if(behaviorChart) behaviorChart.setData(state.baseData);
-            else if (state.section === 'distribution') if(latencyHist) latencyHist.setData(state.baseData);
-        }
-
-        function resetZoom() {
-            state.zoomTransform = { scale: 1, offsetX: 0 };
-            document.getElementById('zoomLevel').textContent = '1x zoom';
-            document.getElementById('resetZoomBtn').classList.add('hidden');
-            if (mainChart) mainChart.draw();
-        }
-
-        function drawOverlay() {
-            const canvas = document.getElementById('mainChartOverlay');
-            if (!canvas || !mainChart || mainChart.data.length === 0) return;
-            const ctx = canvas.getContext('2d');
-            const container = document.getElementById('mainChartContainer');
-            const rect = container.getBoundingClientRect();
-            const dpr = Math.min(window.devicePixelRatio || 1, 2);
-            
-            canvas.width = rect.width * dpr;
-            canvas.height = rect.height * dpr;
-            canvas.style.width = rect.width + 'px';
-            canvas.style.height = rect.height + 'px';
-            ctx.setTransform(1, 0, 0, 1, 0, 0);
-            ctx.scale(dpr, dpr);
-            
-            const lats = mainChart.data.map(d=>d.latency);
-            const minL = Math.min(...lats) * 0.9;
-            const maxL = Math.max(...lats) * 1.1;
-            const range = Math.max(maxL - minL, 1);
-            const chartH = mainChart.height - mainChart.padding.top - mainChart.padding.bottom;
-            const calcY = (val) => mainChart.padding.top + chartH - ((val - minL) / range) * chartH;
-
-            if (state.hoveredPoint) {
-                const p = state.hoveredPoint;
-                const y = calcY(p.data.latency);
-                const x = mainChart.timeToX(p.data.timestamp);
-                
-                ctx.beginPath();
-                ctx.arc(x, y, 12, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(0, 200, 150, 0.1)';
-                ctx.fill();
-                ctx.beginPath();
-                ctx.arc(x, y, 6, 0, Math.PI * 2);
-                ctx.strokeStyle = '#00c896';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-            }
-
-            if (state.analysis.pointA) drawSelectionPoint(ctx, state.analysis.pointA, '#3b82f6', 'A', calcY);
-            if (state.analysis.pointB) drawSelectionPoint(ctx, state.analysis.pointB, '#e6a23c', 'B', calcY);
-        }
-
-        function drawSelectionPoint(ctx, point, color, label, calcY) {
-             const x = mainChart.timeToX(point.data.timestamp);
-             const y = calcY(point.data.latency);
-             ctx.beginPath();
-             ctx.arc(x, y, 8, 0, Math.PI * 2);
-             ctx.strokeStyle = color; 
-             ctx.lineWidth = 2; 
-             ctx.stroke();
-             ctx.fillStyle = color.replace(')', ', 0.3)').replace('rgb', 'rgba');
-             ctx.fill();
-             ctx.fillStyle = '#fff'; 
-             ctx.font = 'bold 10px IBM Plex Mono'; 
-             ctx.textAlign = 'center';
-             ctx.fillText(label, x, y + 3);
-        }
-
-        function handleChartClick(point) {
-            if (!point) return;
-            if (!state.analysis.pointA) state.analysis.pointA = point;
-            else if (!state.analysis.pointB) {
-                 if (point.data.timestamp < state.analysis.pointA.data.timestamp) {
-                    state.analysis.pointB = state.analysis.pointA;
-                    state.analysis.pointA = point;
-                } else { state.analysis.pointB = point; }
-            } else {
-                state.analysis.pointA = point;
-                state.analysis.pointB = null;
-            }
-            updateAnalysisUI();
-            drawOverlay();
-        }
-
-        function updateAnalysisUI() {
-            const panel = document.getElementById('analysisPanel');
-            const { pointA, pointB } = state.analysis;
-            if (!pointA) { panel.style.maxHeight = '0'; panel.style.opacity = '0'; return; }
-            panel.style.maxHeight = '1000px'; panel.style.opacity = '1';
-            document.getElementById('pointADetails').innerHTML = `<div>${new Date(pointA.data.timestamp).toLocaleString()}</div><div class="text-lg text-[var(--accent)]">${formatLatency(pointA.data.latency)}</div>`;
-            if (!pointB) return;
-            document.getElementById('pointBDetails').innerHTML = `<div>${new Date(pointB.data.timestamp).toLocaleString()}</div><div class="text-lg text-[var(--accent)]">${formatLatency(pointB.data.latency)}</div>`;
-            const delta = pointB.data.latency - pointA.data.latency;
-            document.getElementById('systemDelta').innerHTML = formatLatency(delta);
-        }
-
-        function setupEvents() {
-            // Modal Buttons
-            document.getElementById('toolboxBtn').addEventListener('click', () => openModal('toolboxModal'));
-            document.getElementById('helpBtn').addEventListener('click', () => openModal('helpModal'));
-
-            document.querySelectorAll('[data-granularity]').forEach(btn => {
-                btn.addEventListener('click', async () => {
-                    const newGran = btn.dataset.granularity;
-                    if(state.granularity === newGran) return;
-                    state.granularity = newGran;
-                    await fetchSystemData(GRANULARITY_MAP[state.granularity]);
-                });
-            });
-
-            document.querySelectorAll('.section-tab').forEach(tab => {
-                tab.addEventListener('click', () => {
-                    document.querySelectorAll('.section-tab').forEach(t => t.classList.remove('active'));
-                    tab.classList.add('active');
-                    state.section = tab.dataset.section;
-                    document.querySelectorAll('.section-content').forEach(s => s.classList.add('hidden'));
-                    document.getElementById('section-' + state.section).classList.remove('hidden');
-                    updateSection();
-                });
-            });
-
-            document.getElementById('resetZoomBtn').addEventListener('click', resetZoom);
-            document.getElementById('clearSelection').addEventListener('click', () => {
-                state.analysis = { pointA: null, pointB: null };
-                updateAnalysisUI(); drawOverlay();
-            });
-            
-            document.getElementById('refreshBtn').addEventListener('click', async () => {
-                await fetchSystemData(GRANULARITY_MAP[state.granularity]);
-            });
-
-            window.addEventListener('resize', () => {
-                if (mainChart) mainChart.resize();
-                if (behaviorChart) behaviorChart.resize();
-                if (latencyHist) latencyHist.resize();
-                updateView();
-            });
-        }
-
-        document.addEventListener('DOMContentLoaded', initCharts);
-    </script>
+      // Resize Handler
+      window.addEventListener('resize', () => {
+          if (mainChart) { mainChart.resize(); mainChart.draw(); }
+          if (deviationChart) { deviationChart.resize(); deviationChart.draw(); }
+      });
+      
+      resolutionSelect.addEventListener('change', loadLatencyDeviationData);
+      loadLatencyDeviationData();
+    });
+  </script>
 </body>
 </html>

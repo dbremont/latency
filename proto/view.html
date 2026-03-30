@@ -168,6 +168,16 @@
       justify-content: center;
       gap: 12px;
     }
+    
+    .chart-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-height: 240px; 
+    }
+
+    /* Canvas styles */
+    .chart-container canvas { position: absolute; top: 0; left: 0; }
 
     .chart-placeholder-icon {
       width: 48px;
@@ -175,6 +185,16 @@
       color: var(--fg-muted);
       opacity: 0.6;
     }
+
+    /* Tooltip styles */
+    .tooltip {
+        position: fixed; background: var(--bg-card); border: 1px solid var(--border);
+        border-radius: 6px; padding: 8px 12px; font-size: 11px; pointer-events: none;
+        opacity: 0; transform: translateY(3px); transition: opacity 0.1s ease;
+        z-index: 1000; box-shadow: var(--shadow-lg);
+        min-width: 140px;
+    }
+    .tooltip.visible { opacity: 1; transform: translateY(0); }
 
     /* Table */
     .data-table {
@@ -368,12 +388,145 @@
       padding-bottom: 8px;
       border-bottom: 1px solid var(--border);
     }
+
+    /* Loading Overlay */
+    .loading-overlay {
+        position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(248, 250, 252, 0.8); backdrop-filter: blur(2px);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 20; border-radius: 6px;
+    }
+    .loading-pulse { animation: pulse 1.5s infinite ease-in-out; }
+    @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+
+    /* Elegant Toggle Buttons */
+    .toggle-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .toggle-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 14px;
+        font-size: 12px;
+        font-weight: 500;
+        font-family: 'IBM Plex Mono', monospace;
+        border-radius: 20px;
+        border: 1px solid var(--border);
+        background: var(--bg-card);
+        color: var(--fg-muted);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        user-select: none;
+    }
+
+    .toggle-btn:hover {
+        border-color: var(--border-dark);
+        background: var(--bg);
+    }
+
+    .toggle-btn .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--fg-muted);
+        opacity: 0.5;
+        transition: all 0.2s ease;
+    }
+
+    /* Active State - Elegant & Colorful */
+    .toggle-btn.active {
+        border-color: var(--toggle-color);
+        background: color-mix(in srgb, var(--toggle-color) 10%, transparent);
+        color: var(--toggle-color);
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--toggle-color) 20%, transparent);
+    }
+
+    .toggle-btn.active .dot {
+        background: var(--toggle-color);
+        opacity: 1;
+        box-shadow: 0 0 4px var(--toggle-color);
+    }
+
+    /* Route Selector Button - Elegant Style */
+    .route-selector-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        font-size: 13px;
+        font-weight: 500;
+        border-radius: 6px;
+        border: 1px solid var(--accent);
+        background: var(--accent-light);
+        color: var(--accent);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        box-shadow: 0 1px 2px rgba(8, 145, 178, 0.05);
+    }
+    .route-selector-btn:hover {
+        background: var(--accent);
+        color: white;
+        border-color: var(--accent);
+    }
+    .route-selector-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    /* Route List Item in Modal */
+    .route-list-item {
+        display: flex;
+        align-items: center;
+        padding: 10px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background 0.15s ease;
+    }
+    .route-list-item:hover {
+        background: var(--bg);
+    }
+    .route-checkbox {
+        appearance: none;
+        width: 18px;
+        height: 18px;
+        border: 1px solid var(--border-dark);
+        border-radius: 4px;
+        margin-right: 12px;
+        cursor: pointer;
+        position: relative;
+        transition: all 0.15s ease;
+    }
+    .route-checkbox:checked {
+        background: var(--accent);
+        border-color: var(--accent);
+    }
+    .route-checkbox:checked::after {
+        content: '';
+        position: absolute;
+        left: 5px;
+        top: 2px;
+        width: 5px;
+        height: 9px;
+        border: solid white;
+        border-width: 0 2px 2px 0;
+        transform: rotate(45deg);
+    }
+    .route-color-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 10px;
+    }
   </style>
 </head>
 <body>
   <!-- Header -->
   <header class="bg-white border-b border-[var(--border)] sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+    <div class="max-w-[1400px] mx-auto px-4 sm:px-6 py-4">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div class="flex items-center gap-3">
           <div class="w-9 h-9 rounded-lg bg-[var(--accent)] flex items-center justify-center">
@@ -389,8 +542,8 @@
 
         <div class="flex items-center gap-3">
           <div class="flex items-center gap-2 px-3 py-1.5 rounded-md bg-[var(--success-light)] border border-[var(--success)]">
-            <span class="w-2 h-2 rounded-full bg-[var(--success)]"></span>
-            <span class="text-xs font-medium text-[var(--success)]">Ready</span>
+            <span class="w-2 h-2 rounded-full bg-[var(--success)]" id="statusIndicator"></span>
+            <span class="text-xs font-medium text-[var(--success)]" id="statusText">Ready</span>
           </div>
           <select id="resolutionSelect" class="btn font-mono text-xs" aria-label="Time resolution">
             <option value="1min">1 min</option>
@@ -425,7 +578,6 @@
               </button>
             </div>
           </div>
-          
         </div>
       </div>
     </div>
@@ -433,7 +585,7 @@
 
   <!-- Navigation -->
   <nav class="bg-white border-b border-[var(--border)] overflow-x-auto" aria-label="Main navigation">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6">
+    <div class="max-w-[1400px] mx-auto px-4 sm:px-6">
       <div class="flex">
         <button class="nav-tab active" data-view="latency">Latency</button>
         <button class="nav-tab" data-view="distribution">Distribution</button>
@@ -445,7 +597,7 @@
     </div>
   </nav>
 
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+  <main class="max-w-[1400px] mx-auto px-4 sm:px-6 py-6">
     
     <!-- LATENCY VIEW -->
     <div id="view-latency" class="view-panel active">
@@ -453,9 +605,9 @@
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div class="card p-4 animate-in stagger-1">
           <p class="metric-label">System P50</p>
-          <p class="metric-value text-[var(--fg)] mt-2">--</p>
+          <p class="metric-value text-[var(--fg)] mt-2" id="metric-p50">--</p>
           <p class="text-xs text-[var(--fg-muted)] mt-1 font-mono">milliseconds</p>
-          <div class="mt-3 flex items-center gap-1 text-xs font-mono text-[var(--success)]">
+          <div class="mt-3 flex items-center gap-1 text-xs font-mono text-[var(--success)]" id="trend-p50">
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
             </svg>
@@ -465,9 +617,9 @@
 
         <div class="card p-4 animate-in stagger-2">
           <p class="metric-label">System P95</p>
-          <p class="metric-value text-[var(--warning)] mt-2">--</p>
+          <p class="metric-value text-[var(--warning)] mt-2" id="metric-p95">--</p>
           <p class="text-xs text-[var(--fg-muted)] mt-1 font-mono">milliseconds</p>
-          <div class="mt-3 flex items-center gap-1 text-xs font-mono text-[var(--danger)]">
+          <div class="mt-3 flex items-center gap-1 text-xs font-mono text-[var(--danger)]" id="trend-p95">
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
             </svg>
@@ -477,9 +629,9 @@
 
         <div class="card p-4 animate-in stagger-3">
           <p class="metric-label">System P99</p>
-          <p class="metric-value text-[var(--danger)] mt-2">--</p>
+          <p class="metric-value text-[var(--danger)] mt-2" id="metric-p99">--</p>
           <p class="text-xs text-[var(--fg-muted)] mt-1 font-mono">milliseconds</p>
-          <div class="mt-3 flex items-center gap-1 text-xs font-mono text-[var(--danger)]">
+          <div class="mt-3 flex items-center gap-1 text-xs font-mono text-[var(--danger)]" id="trend-p99">
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
             </svg>
@@ -489,9 +641,9 @@
 
         <div class="card p-4 animate-in stagger-4">
           <p class="metric-label">Request Volume</p>
-          <p class="metric-value text-[var(--accent)] mt-2">--</p>
+          <p class="metric-value text-[var(--accent)] mt-2" id="metric-volume">--</p>
           <p class="text-xs text-[var(--fg-muted)] mt-1 font-mono">requests/interval</p>
-          <div class="mt-3 flex items-center gap-1 text-xs font-mono text-[var(--success)]">
+          <div class="mt-3 flex items-center gap-1 text-xs font-mono text-[var(--success)]" id="trend-volume">
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
             </svg>
@@ -500,49 +652,67 @@
         </div>
       </div>
 
-      <!-- Main Chart -->
-      <div class="card p-5 mb-6 animate-in stagger-3">
+      <!-- Row 1: Workload Intensity -->
+      <div class="card p-5 mb-6 animate-in stagger-3 relative">
+        <div id="loadingOverlay" class="loading-overlay hidden">
+            <div class="text-center">
+                <div class="text-sm font-mono text-[var(--accent)] loading-pulse">WORKING ON IT...</div>
+            </div>
+        </div>
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div>
-            <h2 class="text-base font-semibold">System Latency Over Time</h2>
-            <p class="text-sm text-[var(--fg-muted)]">Temporal evolution of latency quantiles</p>
+            <h2 class="text-base font-semibold">Task Arrival Rate</h2>
+            <p class="text-sm text-[var(--fg-muted)]">Request volume over time</p>
           </div>
-          <div class="flex gap-2">
-            <button class="chip active" data-scope="system">System</button>
-            <button class="chip" data-scope="routes">By Route</button>
+          <div class="flex items-center gap-3">
+            <button class="btn hidden" id="resetZoomBtn">Reset Zoom</button>
+            <span class="text-[10px] font-mono px-2 py-1 rounded bg-[var(--accent-light)] text-[var(--accent)]" id="zoomLevel">1x zoom</span>
           </div>
         </div>
-        <div class="chart-placeholder">
-          <svg class="chart-placeholder-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
-          </svg>
-          <p class="text-sm text-[var(--fg-secondary)]">Load CSV data to visualize latency time series</p>
-          <p class="text-xs text-[var(--fg-muted)] font-mono">Schema: TIME, ROUTE, DURATION</p>
+        <div class="chart-container" id="chart-workload-container" style="cursor: crosshair;">
+           <!-- SVG rendered by existing logic -->
         </div>
       </div>
 
-      <!-- Secondary Charts -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="card p-5 animate-in stagger-4">
-          <h2 class="text-base font-semibold mb-1">Latency Deviation</h2>
-          <p class="text-sm text-[var(--fg-muted)] mb-4">Deviation from baseline latency over time</p>
-          <div class="chart-placeholder" style="min-height: 200px;">
-            <svg class="chart-placeholder-icon" style="width: 36px; height: 36px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
-            </svg>
-            <p class="text-sm text-[var(--fg-muted)]">No data loaded</p>
+      <!-- Row 2: Route Latency Metrics -->
+      <div class="card p-5 mb-6 animate-in stagger-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 class="text-base font-semibold">Route Latency</h2>
+            <p class="text-sm text-[var(--fg-muted)]">Select routes and metrics to display</p>
+          </div>
+          <div class="flex items-center gap-3">
+             <!-- Metric Toggles -->
+             <div class="toggle-group" id="route-metric-toggles">
+                <!-- Injected by JS -->
+             </div>
+             <!-- Route Selector Button -->
+             <button id="routeSelectBtn" class="route-selector-btn" onclick="openRouteModal()">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+                </svg>
+                <span>Select Routes</span>
+            </button>
           </div>
         </div>
+        <div class="chart-container" id="chart-route-container" style="cursor: crosshair; min-height: 240px;">
+           <!-- Canvases injected by JS -->
+        </div>
+      </div>
 
-        <div class="card p-5 animate-in stagger-4">
-          <h2 class="text-base font-semibold mb-1">Rate of Change</h2>
-          <p class="text-sm text-[var(--fg-muted)] mb-4">First derivative: dL/dt</p>
-          <div class="chart-placeholder" style="min-height: 200px;">
-            <svg class="chart-placeholder-icon" style="width: 36px; height: 36px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"/>
-            </svg>
-            <p class="text-sm text-[var(--fg-muted)]">No data loaded</p>
+      <!-- Row 3: System Latency Deviation -->
+      <div class="card p-5 animate-in stagger-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 class="text-base font-semibold">System Latency Deviation</h2>
+            <p class="text-sm text-[var(--fg-muted)]">System-level statistical metrics</p>
           </div>
+          <div class="toggle-group" id="deviation-toggles">
+             <!-- Injected by JS -->
+          </div>
+        </div>
+        <div class="chart-container" id="chart-deviation-container" style="cursor: crosshair; min-height: 240px;">
+           <!-- Canvases injected by JS -->
         </div>
       </div>
     </div>
@@ -797,15 +967,61 @@
 
   </main>
 
-  <!-- Footer -->
-  <footer class="border-t border-[var(--border)] mt-8 bg-white">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-      <div class="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-[var(--fg-muted)]">
-        <span>System Performance Model Tool</span>
-        <span class="font-mono">Model: M = (H, Z, E, W, T, C, P)</span>
+  <!-- Sophisticated Footer -->
+  <footer class="bg-white border-t border-[var(--border)] mt-12">
+    <div class="max-w-[1400px] mx-auto px-4 sm:px-6 py-8">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+        
+        <!-- Column 1: Model Signature -->
+        <div class="space-y-3">
+          <div class="flex items-center gap-2 text-xs font-semibold text-[var(--fg-muted)] uppercase tracking-wider">
+             <span>Model Specification</span>
+          </div>
+          <div class="p-3 rounded-md bg-[var(--bg-alt)] border border-[var(--border)] font-mono text-xs text-[var(--fg-secondary)] leading-relaxed">
+            M = (H, Z, E, W, T, C, P)
+            <div class="mt-2 pt-2 border-t border-[var(--border)] text-[var(--fg-muted)]">
+              <span class="text-[var(--accent)]">H</span>idden &nbsp;·&nbsp; 
+              <span class="text-[var(--accent)]">Z</span>latent &nbsp;·&nbsp; 
+              <span class="text-[var(--accent)]">E</span>lasticity
+            </div>
+          </div>
+        </div>
+
+        <!-- Column 2: Status & System -->
+        <div class="text-center">
+           <div class="flex items-center justify-center gap-2 mb-3">
+             <div class="w-2 h-2 rounded-full bg-[var(--success)] animate-pulse"></div>
+             <span class="text-xs font-medium text-[var(--fg-secondary)]">System Operational</span>
+           </div>
+           <p class="text-xs text-[var(--fg-muted)]">
+             System Performance Model Tool<br>
+             <span class="font-mono">v2.1.0-stable</span>
+           </p>
+        </div>
+
+        <!-- Column 3: Data Info -->
+        <div class="text-right space-y-2">
+           <div class="text-xs font-semibold text-[var(--fg-muted)] uppercase tracking-wider mb-2">Data Properties</div>
+           <div class="text-xs text-[var(--fg-secondary)] font-mono">
+             <div>Resolution: <span id="footerResolution">25min</span></div>
+             <div>Last Sync: <span id="footerTime">--</span></div>
+           </div>
+        </div>
+
+      </div>
+      
+      <div class="mt-8 pt-4 border-t border-[var(--border)] flex justify-between items-center text-[10px] text-[var(--fg-muted)]">
+        <span>Latency Analysis Framework</span>
+        <span>Developed for System Performance Insights</span>
       </div>
     </div>
   </footer>
+
+  <!-- Tooltip -->
+  <div id="tooltip" class="tooltip font-mono">
+    <div class="text-[var(--fg-muted)] text-[10px] mb-1" id="tooltip-time"></div>
+    <div class="text-[var(--fg)]" id="tooltip-value"></div>
+  </div>
 
   <!-- HELP MODAL -->
   <div id="helpModal" class="modal-overlay" role="dialog" aria-modal="true">
@@ -888,10 +1104,44 @@
     </div>
   </div>
 
+  <!-- ROUTE SELECTION MODAL -->
+  <div id="routeModal" class="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal-content" style="max-width: 450px;">
+      <div class="flex items-center justify-between p-4 border-b border-[var(--border)]">
+        <h2 class="text-base font-semibold">Select Routes</h2>
+        <button onclick="closeRouteModal()" class="btn-ghost rounded-full p-1">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+        </button>
+      </div>
+      <div class="p-4 border-b border-[var(--border)]">
+        <div class="relative">
+            <input type="text" id="routeSearchInput" placeholder="Search routes..." 
+                   class="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-md focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+                   oninput="filterRoutes(this.value)">
+            <svg class="w-4 h-4 absolute right-3 top-2.5 text-[var(--fg-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+        </div>
+      </div>
+      <div class="p-2 overflow-y-auto" style="max-height: 400px;" id="routeListContainer">
+        <!-- Injected by JS -->
+      </div>
+      <div class="p-3 bg-[var(--bg)] border-t border-[var(--border)] flex justify-end gap-2">
+        <button class="btn" onclick="deselectAllRoutes()">Deselect All</button>
+        <button class="btn active" onclick="closeRouteModal()">Apply</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // ========================================
-    // Data
+    // Configuration & State
     // ========================================
+    const API_BASE_URL = "http://127.0.0.1:8000"; 
+    let currentData = null;
+
     const ROUTES = [
       'api/users',
       'api/orders', 
@@ -902,6 +1152,16 @@
       'api/checkout',
       'api/inventory'
     ];
+
+    // Fake Routes for Selection Mechanism
+    const FAKE_ROUTES = [
+        { id: 'route_a', name: 'GET /api/users', color: '#0891b2' },
+        { id: 'route_b', name: 'POST /api/orders', color: '#d97706' },
+        { id: 'route_c', name: 'GET /api/products', color: '#059669' },
+        { id: 'route_d', name: 'PUT /api/inventory', color: '#7c3aed' }
+    ];
+
+    let selectedRoutes = new Set(['route_a', 'route_b']); // Default selected
 
     const LATENT_RESOURCES = [
       { name: 'CPU Intensive', key: 'cpu' },
@@ -914,6 +1174,23 @@
     
     const VIEWS = ['latency', 'distribution', 'workload', 'decomposition', 'matrix', 'elasticity'];
 
+    // Global UI State
+    let currentViewIndex = 0;
+
+    // State for Route Metric Toggles (New Requirement)
+    const routeMetricsConfig = [
+        { id: 'latency', label: 'Latency', color: '#0891b2', active: true },
+        { id: 'deviation', label: 'Deviation', color: '#d97706', active: false },
+        { id: 'latency_variance', label: 'Latency Var', color: '#7c3aed', active: false },
+        { id: 'deviation_variance', label: 'Deviation Var', color: '#e11d48', active: false }
+    ];
+
+    // State for System Deviation Toggles
+    const systemMetricsConfig = [
+        { id: 'sys_deviation', label: 'Deviation', color: '#059669', active: true },
+        { id: 'sys_variance', label: 'Variance', color: '#e11d48', active: false }
+    ];
+
     // ========================================
     // DOM Elements
     // ========================================
@@ -924,18 +1201,793 @@
     const dropdownMenu = document.getElementById('dropdownMenu');
     const helpModal = document.getElementById('helpModal');
     const docModal = document.getElementById('docModal');
+    const routeModal = document.getElementById('routeModal');
+    const resolutionSelect = document.getElementById('resolutionSelect');
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const tooltipEl = document.getElementById('tooltip');
+
+    // ========================================
+    // ZoomableChart Class (Multi-Line Support)
+    // ========================================
+    class ZoomableChart {
+      constructor(containerId, options = {}) {
+        this.container = document.getElementById(containerId);
+        if (!this.container) return;
+
+        this.lineColor = options.lineColor || '#0891b2';
+        
+        this.zoomTransform = { scale: 1, offsetX: 0 };
+        this.isDragging = false;
+        this.lastMouseX = 0;
+        this.hoveredPoint = null;
+        
+        this.datasets = []; 
+        this.dataResolution = '25min';
+        
+        this.canvas = document.createElement('canvas');
+        this.canvas.id = containerId + '-canvas';
+        this.overlay = document.createElement('canvas');
+        this.overlay.id = containerId + '-overlay';
+        
+        this.container.innerHTML = ''; 
+        this.container.appendChild(this.canvas);
+        this.container.appendChild(this.overlay);
+
+        this.ctx = this.canvas.getContext('2d');
+        this.octx = this.overlay.getContext('2d');
+        
+        this.padding = { top: 20, right: 20, bottom: 40, left: 50 };
+        
+        this.resize();
+        this.setupInteractions();
+      }
+
+      resize() {
+        const rect = this.container.getBoundingClientRect();
+        if(rect.width === 0) return;
+        
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        
+        this.canvas.width = rect.width * dpr;
+        this.canvas.height = rect.height * dpr;
+        this.canvas.style.width = rect.width + 'px';
+        this.canvas.style.height = rect.height + 'px';
+        
+        this.overlay.width = rect.width * dpr;
+        this.overlay.height = rect.height * dpr;
+        this.overlay.style.width = rect.width + 'px';
+        this.overlay.style.height = rect.height + 'px';
+
+        this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+        this.ctx.scale(dpr, dpr);
+        this.octx.setTransform(1, 0, 0, 1, 0, 0);
+        this.octx.scale(dpr, dpr);
+        
+        this.width = rect.width;
+        this.height = rect.height;
+      }
+
+      setDatasets(datasets, resolution) {
+        this.datasets = datasets;
+        this.dataResolution = resolution;
+        this.draw();
+      }
+
+      getTimeRange() {
+          let minT = Infinity, maxT = -Infinity;
+          this.datasets.forEach(ds => {
+              if(ds.data.length > 0) {
+                  minT = Math.min(minT, ds.data[0].timestamp);
+                  maxT = Math.max(maxT, ds.data[ds.data.length - 1].timestamp);
+              }
+          });
+          return { start: minT, end: maxT };
+      }
+
+      timeToX(timestamp) {
+        const { start, end } = this.getTimeRange();
+        if (start === Infinity) return 0;
+        
+        const duration = end - start;
+        if (duration === 0) return this.padding.left + (this.width - this.padding.left - this.padding.right) / 2;
+
+        const ratio = (timestamp - start) / duration;
+        
+        const chartW = this.width - this.padding.left - this.padding.right;
+        let x = ratio * chartW;
+        x *= this.zoomTransform.scale;
+        x += this.zoomTransform.offsetX;
+        
+        return x + this.padding.left;
+      }
+
+      xToTime(x) {
+        const { start, end } = this.getTimeRange();
+        if (start === Infinity) return 0;
+        const duration = end - start;
+        
+        const chartW = this.width - this.padding.left - this.padding.right;
+        let rawX = x - this.padding.left;
+        rawX -= this.zoomTransform.offsetX;
+        rawX /= this.zoomTransform.scale;
+        
+        const ratio = rawX / chartW;
+        return start + (ratio * duration);
+      }
+
+      draw() {
+        const { ctx, width, height, datasets, padding } = this;
+        ctx.clearRect(0, 0, width, height);
+
+        if (datasets.length === 0 || datasets.every(ds => ds.data.length === 0)) {
+          ctx.fillStyle = '#94a3b8'; 
+          ctx.font = '12px IBM Plex Sans';
+          ctx.textAlign = 'center';
+          ctx.fillText("Select metrics to display", width/2, height/2);
+          return;
+        }
+
+        const chartW = width - padding.left - padding.right;
+        const chartH = height - padding.top - padding.bottom;
+
+        const visStartTime = this.xToTime(padding.left);
+        const visEndTime = this.xToTime(width - padding.right);
+        const buffer = (visEndTime - visStartTime) * 0.05; 
+
+        let globalMinL = Infinity, globalMaxL = -Infinity;
+        datasets.forEach(ds => {
+            const visibleData = ds.data.filter(d => d.timestamp >= (visStartTime - buffer) && d.timestamp <= (visEndTime + buffer));
+            visibleData.forEach(d => {
+                globalMinL = Math.min(globalMinL, d.latency);
+                globalMaxL = Math.max(globalMaxL, d.latency);
+            });
+        });
+
+        if (globalMinL === Infinity) globalMinL = 0;
+        if (globalMaxL === -Infinity) globalMaxL = 100;
+
+        const minL = globalMinL * 0.9;
+        const maxL = globalMaxL * 1.1;
+        const rangeL = Math.max(maxL - minL, 1);
+        const calcY = (val) => padding.top + chartH - ((val - minL) / rangeL) * chartH;
+
+        this.drawDynamicTimeAxis();
+
+        ctx.fillStyle = '#94a3b8'; ctx.font = '10px IBM Plex Mono'; ctx.textAlign = 'right';
+        ctx.strokeStyle = '#e2e8f0'; ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let i = 0; i <= 4; i++) {
+          const y = padding.top + (chartH * i / 4);
+          ctx.moveTo(padding.left, y);
+          ctx.lineTo(width - padding.right, y);
+          const val = Math.round(maxL - (rangeL * i / 4));
+          ctx.fillText(val + "ms", padding.left - 8, y + 3);
+        }
+        ctx.stroke();
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(padding.left, padding.top, chartW, chartH);
+        ctx.clip();
+
+        datasets.forEach(ds => {
+            if (ds.data.length === 0) return;
+            
+            const visibleData = ds.data.filter(d => d.timestamp >= (visStartTime - buffer) && d.timestamp <= (visEndTime + buffer));
+            
+            ctx.beginPath();
+            visibleData.forEach((d, i) => {
+              const x = this.timeToX(d.timestamp);
+              const y = calcY(d.latency);
+              if (i === 0) ctx.moveTo(x, y);
+              else ctx.lineTo(x, y);
+            });
+            ctx.strokeStyle = ds.color;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            if (['1day', '1week'].includes(this.dataResolution) || visibleData.length < 100) {
+              ctx.fillStyle = ds.color;
+              visibleData.forEach(d => {
+                const x = this.timeToX(d.timestamp);
+                const y = calcY(d.latency);
+                ctx.beginPath();
+                ctx.arc(x, y, 3, 0, Math.PI * 2); 
+                ctx.fill();
+              });
+            }
+        });
+
+        ctx.restore();
+      }
+
+      drawDynamicTimeAxis() {
+        const { ctx, width, height, padding } = this;
+        const { start, end } = this.getTimeRange();
+        if (start === Infinity) return;
+        
+        const chartH = height - padding.top - padding.bottom;
+        const visDuration = end - start;
+        const chartW = width - padding.left - padding.right;
+        const minSpacing = 70; 
+        
+        const steps = [
+          { ms: 60000, unit: 'minute', step: 1 },
+          { ms: 300000, unit: 'minute', step: 5 },
+          { ms: 900000, unit: 'minute', step: 15 },
+          { ms: 3600000, unit: 'hour', step: 1 },
+          { ms: 10800000, unit: 'hour', step: 3 },
+          { ms: 21600000, unit: 'hour', step: 6 },
+          { ms: 43200000, unit: 'hour', step: 12 },
+          { ms: 86400000, unit: 'day', step: 1 },
+        ];
+
+        let minAllowedStepMs = 0;
+        if (this.dataResolution === '1day') minAllowedStepMs = 86400000; 
+
+        const msPerPixel = visDuration / chartW;
+        const msNeeded = msPerPixel * minSpacing;
+
+        let chosenStep = steps[steps.length - 1];
+        for (let s of steps) {
+          if (s.ms >= msNeeded && s.ms >= minAllowedStepMs) {
+            chosenStep = s;
+            break;
+          }
+        }
+
+        const d = new Date(start);
+        if (chosenStep.unit === 'minute') d.setMinutes(Math.floor(d.getMinutes() / chosenStep.step) * chosenStep.step, 0, 0);
+        else if (chosenStep.unit === 'hour') d.setHours(Math.floor(d.getHours() / chosenStep.step) * chosenStep.step, 0, 0, 0);
+        else if (chosenStep.unit === 'day') d.setHours(0, 0, 0, 0);
+
+        let cursor = d.getTime();
+        
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(padding.left, padding.top, chartW, chartH + 30);
+        ctx.clip();
+
+        let safetyCounter = 0;
+        while (cursor < end + chosenStep.ms && safetyCounter < 100) {
+          if (cursor >= start - chosenStep.ms) {
+            const x = this.timeToX(cursor);
+            
+            ctx.strokeStyle = '#e2e8f0'; 
+            ctx.beginPath();
+            ctx.moveTo(x, padding.top);
+            ctx.lineTo(x, padding.top + chartH + 5);
+            ctx.stroke();
+
+            const date = new Date(cursor);
+            let label = "";
+            ctx.fillStyle = '#94a3b8'; 
+            ctx.font = '10px "IBM Plex Sans"';
+            ctx.textAlign = 'center';
+
+            if (chosenStep.unit === 'minute' || chosenStep.unit === 'hour') {
+              label = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+              if (date.getHours() === 0) label = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+            } else {
+               label = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+            }
+            ctx.fillText(label, x, padding.top + chartH + 18);
+          }
+          cursor += chosenStep.ms;
+          safetyCounter++;
+        }
+        ctx.restore();
+      }
+
+      drawOverlay() {
+        const { octx, width, height, datasets, hoveredPoint, padding, container } = this;
+        
+        const rect = container.getBoundingClientRect();
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        if(this.overlay.width !== rect.width * dpr) this.resize();
+
+        octx.clearRect(0, 0, width, height);
+        
+        if (!hoveredPoint || datasets.length === 0) return;
+
+        const mouseX = hoveredPoint.x;
+        const targetTime = this.xToTime(mouseX);
+
+        const visStartTime = this.xToTime(padding.left);
+        const visEndTime = this.xToTime(width - padding.right);
+        let globalMinL = Infinity, globalMaxL = -Infinity;
+        datasets.forEach(ds => {
+            const visibleData = ds.data.filter(d => d.timestamp >= visStartTime && d.timestamp <= visEndTime);
+            visibleData.forEach(d => {
+                globalMinL = Math.min(globalMinL, d.latency);
+                globalMaxL = Math.max(globalMaxL, d.latency);
+            });
+        });
+        if (globalMinL === Infinity) return;
+        const minL = globalMinL * 0.9;
+        const maxL = globalMaxL * 1.1;
+        const rangeL = Math.max(maxL - minL, 1);
+        const chartH = height - padding.top - padding.bottom;
+        const calcY = (val) => padding.top + chartH - ((val - minL) / rangeL) * chartH;
+
+        octx.beginPath();
+        octx.strokeStyle = 'rgba(0,0,0,0.1)';
+        octx.lineWidth = 1;
+        const lineX = this.timeToX(targetTime);
+        octx.moveTo(lineX, padding.top);
+        octx.lineTo(lineX, height - padding.bottom);
+        octx.stroke();
+
+        let tooltipHtml = `<div style='font-size:10px; color:#64748b; margin-bottom:4px;'>${new Date(targetTime).toLocaleString()}</div>`;
+        
+        datasets.forEach(ds => {
+            let closest = null;
+            let minDiff = Infinity;
+            ds.data.forEach(d => {
+                const diff = Math.abs(d.timestamp - targetTime);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closest = d;
+                }
+            });
+
+            if (closest) {
+                const y = calcY(closest.latency);
+                octx.beginPath();
+                octx.arc(lineX, y, 5, 0, Math.PI * 2);
+                octx.fillStyle = ds.color;
+                octx.fill();
+                octx.strokeStyle = '#fff';
+                octx.lineWidth = 2;
+                octx.stroke();
+
+                tooltipHtml += `<div style='display:flex; justify-content:space-between; gap:10px; margin-top:2px;'>
+                    <span style='color:${ds.color}; font-weight:600;'>${ds.label}</span>
+                    <span style='font-family:monospace; color:#334155;'>${closest.latency.toFixed(2)} ms</span>
+                </div>`;
+            }
+        });
+
+        document.getElementById('tooltip-value').innerHTML = tooltipHtml;
+      }
+
+      setupInteractions() {
+        const container = this.container;
+        
+        container.addEventListener('wheel', e => {
+          e.preventDefault();
+          const rect = container.getBoundingClientRect();
+          const mouseX = e.clientX - rect.left;
+          
+          const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+          const newScale = Math.max(1, Math.min(100, this.zoomTransform.scale * zoomFactor));
+          
+          const chartW = this.width - this.padding.left - this.padding.right;
+          const mouseVirtX = (mouseX - this.padding.left - this.zoomTransform.offsetX) / this.zoomTransform.scale;
+          
+          this.zoomTransform.scale = newScale;
+          this.zoomTransform.offsetX = mouseX - this.padding.left - (mouseVirtX * newScale);
+
+          if (newScale === 1) this.zoomTransform.offsetX = 0;
+
+          const maxOffset = 0;
+          const minOffset = -(chartW * (newScale - 1));
+          this.zoomTransform.offsetX = Math.min(maxOffset, Math.max(minOffset, this.zoomTransform.offsetX));
+
+          this.draw();
+          this.drawOverlay();
+
+        }, { passive: false });
+
+        container.addEventListener('mousedown', e => {
+          if (this.zoomTransform.scale > 1) {
+            this.isDragging = true;
+            this.lastMouseX = e.clientX;
+            container.style.cursor = 'grabbing';
+          }
+        });
+
+        window.addEventListener('mousemove', e => {
+          if (this.isDragging) {
+            const dx = e.clientX - this.lastMouseX;
+            this.lastMouseX = e.clientX;
+            this.zoomTransform.offsetX += dx;
+
+            const chartW = this.width - this.padding.left - this.padding.right;
+            const maxOffset = 0;
+            const minOffset = -(chartW * (this.zoomTransform.scale - 1));
+            this.zoomTransform.offsetX = Math.min(maxOffset, Math.max(minOffset, this.zoomTransform.offsetX));
+
+            this.draw();
+            this.drawOverlay();
+            return;
+          }
+          
+          const rect = container.getBoundingClientRect();
+          const isInside = (e.clientX >= rect.left && e.clientX <= rect.right && 
+                            e.clientY >= rect.top && e.clientY <= rect.bottom);
+          
+          if (!isInside) {
+              if (this.hoveredPoint) {
+                  this.hoveredPoint = null;
+                  tooltipEl.classList.remove('visible');
+                  this.drawOverlay();
+              }
+              container.style.cursor = 'crosshair';
+              return;
+          }
+
+          const mouseX = e.clientX - rect.left;
+          this.hoveredPoint = { x: mouseX };
+          
+          tooltipEl.classList.add('visible');
+          let tooltipX = e.clientX + 15;
+          let tooltipY = e.clientY - 10;
+          
+          if (tooltipX + 200 > window.innerWidth) tooltipX = e.clientX - 200;
+          
+          tooltipEl.style.left = tooltipX + 'px';
+          tooltipEl.style.top = tooltipY + 'px';
+          
+          this.drawOverlay();
+        });
+
+        container.addEventListener('mouseleave', () => {
+            if (this.hoveredPoint) {
+                this.hoveredPoint = null;
+                tooltipEl.classList.remove('visible');
+                this.drawOverlay();
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+          if (this.isDragging) {
+            this.isDragging = false;
+            container.style.cursor = 'crosshair';
+          }
+        });
+      }
+    }
+
+    // ========================================
+    // Chart Instances
+    // ========================================
+    let workloadChart = null; // SVG
+    let routeChart = null;
+    let deviationChart = null;
+
+    // ========================================
+    // Toggle Button Rendering
+    // ========================================
+    function renderToggleButtons() {
+        const routeMetricContainer = document.getElementById('route-metric-toggles');
+        const devContainer = document.getElementById('deviation-toggles');
+
+        const createButton = (cfg, group) => {
+            const btn = document.createElement('button');
+            btn.className = `toggle-btn ${cfg.active ? 'active' : ''}`;
+            btn.style.setProperty('--toggle-color', cfg.color);
+            btn.title = group === 'route' ? `Route ${cfg.label}` : `System ${cfg.label}`;
+            btn.innerHTML = `<span class="dot"></span>${cfg.label}`;
+            btn.onclick = () => {
+                cfg.active = !cfg.active;
+                btn.classList.toggle('active', cfg.active);
+                updateChartsFromState();
+            };
+            return btn;
+        };
+
+        // Render Route Metric Toggles
+        if(routeMetricContainer) {
+            routeMetricContainer.innerHTML = '';
+            routeMetricsConfig.forEach(cfg => routeMetricContainer.appendChild(createButton(cfg, 'route')));
+        }
+
+        // Render System Deviation Toggles
+        systemMetricsConfig.forEach(cfg => devContainer.appendChild(createButton(cfg, 'system')));
+    }
+
+    // ========================================
+    // Route Modal Logic
+    // ========================================
+    function openRouteModal() {
+        renderRouteList(); 
+        routeModal.classList.add('active');
+    }
+
+    function closeRouteModal() {
+        routeModal.classList.remove('active');
+        updateChartsFromState(); 
+    }
+
+    function toggleRouteSelection(routeId) {
+        if (selectedRoutes.has(routeId)) {
+            selectedRoutes.delete(routeId);
+        } else {
+            selectedRoutes.add(routeId);
+        }
+        renderRouteList();
+    }
+
+    function deselectAllRoutes() {
+        selectedRoutes.clear();
+        renderRouteList();
+    }
+
+    function filterRoutes(query) {
+        const items = document.querySelectorAll('.route-list-item');
+        const q = query.toLowerCase();
+        items.forEach(item => {
+            const name = item.dataset.name.toLowerCase();
+            item.style.display = name.includes(q) ? 'flex' : 'none';
+        });
+    }
+
+    function renderRouteList() {
+        const container = document.getElementById('routeListContainer');
+        container.innerHTML = '';
+        
+        FAKE_ROUTES.forEach(route => {
+            const isSelected = selectedRoutes.has(route.id);
+            const item = document.createElement('div');
+            item.className = 'route-list-item';
+            item.dataset.name = route.name;
+            item.onclick = () => toggleRouteSelection(route.id);
+            
+            item.innerHTML = `
+                <input type="checkbox" class="route-checkbox" ${isSelected ? 'checked' : ''}>
+                <span class="route-color-dot" style="background: ${route.color};"></span>
+                <span class="text-sm font-medium" style="color: var(--fg);">${route.name}</span>
+            `;
+            container.appendChild(item);
+        });
+    }
+
+    // ========================================
+    // Status Helper
+    // ========================================
+    function setStatus(text, type) {
+      const indicator = document.getElementById('statusIndicator');
+      const statusText = document.getElementById('statusText');
+      statusText.innerText = text;
+
+      indicator.className = 'w-2 h-2 rounded-full';
+      statusText.className = 'text-xs font-medium';
+
+      if (type === 'success') {
+        indicator.classList.add('bg-[var(--success)]');
+        statusText.classList.add('text-[var(--success)]');
+      } else if (type === 'warning') {
+        indicator.classList.add('bg-[var(--warning)]');
+        statusText.classList.add('text-[var(--warning)]');
+      } else if (type === 'danger') {
+        indicator.classList.add('bg-[var(--danger)]');
+        statusText.classList.add('text-[var(--danger)]');
+      }
+    }
+
+    // ========================================
+    // Data Logic
+    // ========================================
+    async function loadLatencyDeviationData() {
+      const resolution = resolutionSelect.value;
+      const url = `${API_BASE_URL}/system/resolution?resolution=${resolution}`;
+
+      setStatus('Loading...', 'warning');
+      if(loadingOverlay) loadingOverlay.classList.remove('hidden');
+
+      document.getElementById('footerResolution').textContent = resolution;
+
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const result = await response.json();
+        currentData = result.data || [];
+        
+        if (currentData.length > 0) {
+          processDataAndRender();
+          setStatus('Ready', 'success');
+        } else {
+          setStatus('No Data', 'warning');
+        }
+
+      } catch (error) {
+        console.error("Could not load data:", error);
+        setStatus('Error', 'danger');
+      } finally {
+          if(loadingOverlay) loadingOverlay.classList.add('hidden');
+      }
+    }
+
+    function processDataAndRender() {
+        if (!currentData || currentData.length === 0) return;
+
+        const baseData = currentData.map(item => ({
+            timestamp: new Date(item.TIME).getTime(),
+            value: item.VALUE || 0,
+            workload: item.WORKLOAD || 0
+        })).sort((a,b) => a.timestamp - b.timestamp);
+
+        updateMetrics(baseData);
+        
+        if (baseData.length > 0) {
+            const lastTime = new Date(baseData[baseData.length - 1].timestamp);
+            document.getElementById('footerTime').textContent = lastTime.toLocaleTimeString();
+        }
+
+        renderLineChart('chart-workload-container', currentData, 'TIME', 'WORKLOAD', 'var(--accent)');
+        updateChartsFromState();
+    }
+
+    function updateChartsFromState() {
+        if (!currentData) return;
+
+        const baseData = currentData.map(item => ({
+            timestamp: new Date(item.TIME).getTime(),
+            value: item.VALUE || 0,
+            workload: item.WORKLOAD || 0
+        })).sort((a,b) => a.timestamp - b.timestamp);
+
+        // Route Chart Logic - Combined Routes + Metrics
+        const routeDatasets = [];
+        
+        // 1. Identify active metrics
+        const activeMetrics = routeMetricsConfig.filter(m => m.active);
+        
+        // 2. Build dataset for each selected route + active metric combination
+        if (selectedRoutes.size > 0 && activeMetrics.length > 0) {
+            FAKE_ROUTES.forEach(route => {
+                if (!selectedRoutes.has(route.id)) return;
+                
+                activeMetrics.forEach(metric => {
+                    // Generate synthetic data based on metric type
+                    const dataPoints = baseData.map(d => {
+                        let latency = 0;
+                        const factor = (FAKE_ROUTES.indexOf(route) * 0.2) + 0.8;
+                        const noise = Math.random() * 5 * factor;
+                        
+                        switch(metric.id) {
+                            case 'latency':
+                                latency = (d.value * factor) + noise;
+                                break;
+                            case 'deviation':
+                                latency = Math.abs((d.value * 0.1 * factor) + noise);
+                                break;
+                            case 'latency_variance':
+                                latency = Math.pow(d.value * 0.05 * factor, 2) + noise;
+                                break;
+                            case 'deviation_variance':
+                                latency = Math.pow(d.value * 0.02 * factor, 2) + noise;
+                                break;
+                        }
+                        return { timestamp: d.timestamp, latency };
+                    });
+                    
+                    routeDatasets.push({ 
+                        data: dataPoints, 
+                        color: route.color, // Use route color to group visually
+                        label: `${route.name.split(' ')[1]} (${metric.label})` // Short label
+                    });
+                });
+            });
+        } else {
+             // Fallback if nothing selected
+             routeDatasets.push({ 
+                data: baseData.map(d => ({ timestamp: d.timestamp, latency: d.value })), 
+                color: '#94a3b8', 
+                label: 'System Latency' 
+            });
+        }
+        
+        if (routeChart) routeChart.setDatasets(routeDatasets, resolutionSelect.value);
+
+        // Deviation Chart Logic (System level)
+        const devDatasets = [];
+        systemMetricsConfig.forEach(cfg => {
+            if (!cfg.active) return;
+
+            let dataPoints = [];
+            if (cfg.id === 'sys_deviation') {
+                dataPoints = baseData.map(d => ({ timestamp: d.timestamp, latency: d.value }));
+            } else if (cfg.id === 'sys_variance') {
+                dataPoints = baseData.map(d => ({ timestamp: d.timestamp, latency: Math.abs(d.value * 0.8 + Math.random() * 10) }));
+            }
+            devDatasets.push({ data: dataPoints, color: cfg.color, label: cfg.label });
+        });
+        if (deviationChart) deviationChart.setDatasets(devDatasets, resolutionSelect.value);
+    }
+
+    function updateMetrics(data) {
+      const values = data.map(d => d.value).sort((a,b) => a-b);
+      const workloads = data.map(d => d.workload);
+      
+      const p50 = values[Math.floor(values.length * 0.5)] || 0;
+      const p95 = values[Math.floor(values.length * 0.95)] || 0;
+      const p99 = values[Math.floor(values.length * 0.99)] || 0;
+      const avgWorkload = (workloads.reduce((a,b)=>a+b, 0) / workloads.length).toFixed(1);
+
+      document.getElementById('metric-p50').innerText = p50;
+      document.getElementById('metric-p95').innerText = p95;
+      document.getElementById('metric-p99').innerText = p99;
+      document.getElementById('metric-volume').innerText = avgWorkload;
+    }
+
+    // ========================================
+    // Simple SVG Renderer (For Workload)
+    // ========================================
+    function renderLineChart(containerId, data, xKey, yKey, color) {
+      const container = document.getElementById(containerId);
+      if (!container || data.length === 0) return;
+
+      container.innerHTML = '';
+
+      const width = container.clientWidth || 600;
+      const height = 240;
+      const padding = 20;
+
+      const vals = data.map(d => d[yKey]);
+      const minVal = Math.min(...vals);
+      const maxVal = Math.max(...vals);
+      const range = maxVal - minVal || 1;
+
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("width", "100%");
+      svg.setAttribute("height", height);
+      svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+      svg.style.overflow = "visible";
+
+      for (let i = 0; i <= 4; i++) {
+        const y = padding + (i * (height - 2 * padding) / 4);
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute("x1", padding);
+        line.setAttribute("y1", y);
+        line.setAttribute("x2", width - padding);
+        line.setAttribute("y2", y);
+        line.setAttribute("stroke", "var(--border)");
+        line.setAttribute("stroke-width", "1");
+        svg.appendChild(line);
+      }
+
+      const points = data.map((d, i) => {
+        const x = padding + (i / (data.length - 1)) * (width - 2 * padding);
+        const y = height - padding - ((d[yKey] - minVal) / range) * (height - 2 * padding);
+        return `${x},${y}`;
+      }).join(' ');
+
+      const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+      polyline.setAttribute("points", points);
+      polyline.setAttribute("fill", "none");
+      polyline.setAttribute("stroke", color);
+      polyline.setAttribute("stroke-width", "2");
+      svg.appendChild(polyline);
+
+      const areaPath = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+      const areaPoints = `${padding},${height - padding} ${points} ${width - padding},${height - padding}`;
+      areaPath.setAttribute("points", areaPoints);
+      areaPath.setAttribute("fill", color);
+      areaPath.setAttribute("opacity", "0.1");
+      svg.appendChild(areaPath);
+
+      container.appendChild(svg);
+    }
 
     // ========================================
     // View Navigation
     // ========================================
-    let currentViewIndex = 0;
-
     function switchView(viewName) {
       const index = VIEWS.indexOf(viewName);
       if (index !== -1) currentViewIndex = index;
       
       tabs.forEach((tab, i) => tab.classList.toggle('active', i === currentViewIndex));
       viewPanels.forEach((p, i) => p.classList.toggle('active', i === currentViewIndex));
+      
+      setTimeout(() => {
+          if (viewName === 'latency') {
+              if(routeChart) { routeChart.resize(); routeChart.draw(); }
+              if(deviationChart) { deviationChart.resize(); deviationChart.draw(); }
+              if(currentData) renderLineChart('chart-workload-container', currentData, 'TIME', 'WORKLOAD', 'var(--accent)');
+          }
+      }, 0);
     }
 
     tabs.forEach((tab, i) => tab.addEventListener('click', () => {
@@ -943,7 +1995,6 @@
       switchView(VIEWS[i]);
     }));
 
-    // Scope chip toggle
     scopeChips.forEach(chip => {
       chip.addEventListener('click', () => {
         scopeChips.forEach(c => c.classList.remove('active'));
@@ -976,10 +2027,24 @@
     function closeHelpModal() { helpModal.classList.remove('active'); }
     function openDocModal() { docModal.classList.add('active'); }
     function closeDocModal() { docModal.classList.remove('active'); }
-    function triggerExport() { alert("Exporting data..."); }
+    
+    function triggerExport() { 
+      if (currentData) {
+        const blob = new Blob([JSON.stringify(currentData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `system-data-${resolutionSelect.value}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        alert("No data loaded to export.");
+      }
+    }
 
     helpModal.addEventListener('click', (e) => { if (e.target === helpModal) closeHelpModal(); });
     docModal.addEventListener('click', (e) => { if (e.target === docModal) closeDocModal(); });
+    routeModal.addEventListener('click', (e) => { if (e.target === routeModal) closeRouteModal(); });
 
     // ========================================
     // Render Tables
@@ -987,20 +2052,15 @@
     function renderRouteTable() {
       const tbody = document.getElementById('routeTable');
       if (!tbody) return;
-
       let html = '';
       ROUTES.forEach(route => {
-        html += `
-          <tr>
+        html += `<tr>
             <td class="font-medium">${route}</td>
             <td class="text-right text-[var(--fg-muted)]">-- ms</td>
             <td class="text-right text-[var(--warning)]">-- ms</td>
             <td class="text-right text-[var(--fg-muted)]">--%</td>
-            <td class="text-right">
-              <span class="px-2 py-0.5 rounded bg-[var(--bg)] text-[var(--fg-muted)]">--</span>
-            </td>
-          </tr>
-        `;
+            <td class="text-right"><span class="px-2 py-0.5 rounded bg-[var(--bg)] text-[var(--fg-muted)]">--</span></td>
+        </tr>`;
       });
       tbody.innerHTML = html;
     }
@@ -1008,23 +2068,16 @@
     function renderMatrixTable() {
       const table = document.getElementById('matrixTable');
       if (!table) return;
-
       let html = '<thead><tr><th>Route</th>';
-      LATENT_RESOURCES.forEach((r, i) => {
-        html += `<th class="text-center">R${i + 1}</th>`;
-      });
+      LATENT_RESOURCES.forEach((r, i) => { html += `<th class="text-center">R${i + 1}</th>`; });
       html += '</tr></thead><tbody>';
-
       ROUTES.forEach(route => {
         html += `<tr><td class="font-medium">${route}</td>`;
         LATENT_RESOURCES.forEach(() => {
-          html += `<td class="text-center">
-            <div class="w-8 h-8 mx-auto rounded bg-[var(--bg)] border border-[var(--border)] flex items-center justify-center text-xs text-[var(--fg-muted)]">--</div>
-          </td>`;
+          html += `<td class="text-center"><div class="w-8 h-8 mx-auto rounded bg-[var(--bg)] border border-[var(--border)] flex items-center justify-center text-xs text-[var(--fg-muted)]">--</div></td>`;
         });
         html += '</tr>';
       });
-
       html += '</tbody>';
       table.innerHTML = html;
     }
@@ -1032,20 +2085,17 @@
     function renderLatentResources() {
       const container = document.getElementById('latentResources');
       if (!container) return;
-
       let html = '';
       LATENT_RESOURCES.forEach((r, i) => {
-        html += `
-          <div class="p-3 rounded-lg bg-[var(--bg)] border border-[var(--border)]">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-sm text-[var(--fg-secondary)]">${r.name}</span>
-              <span class="text-xs font-mono text-[var(--fg-muted)]">R${i + 1}</span>
-            </div>
-            <div class="h-1.5 rounded-full bg-[var(--border)]">
-              <div class="h-full rounded-full bg-[var(--accent)]" style="width: 0%"></div>
-            </div>
+        html += `<div class="p-3 rounded-lg bg-[var(--bg)] border border-[var(--border)]">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm text-[var(--fg-secondary)]">${r.name}</span>
+            <span class="text-xs font-mono text-[var(--fg-muted)]">R${i + 1}</span>
           </div>
-        `;
+          <div class="h-1.5 rounded-full bg-[var(--border)]">
+            <div class="h-full rounded-full bg-[var(--accent)]" style="width: 0%"></div>
+          </div>
+        </div>`;
       });
       container.innerHTML = html;
     }
@@ -1054,49 +2104,24 @@
     // Keyboard Navigation
     // ========================================
     let lastKey = '', lastTime = 0;
-    const COMBO_THRESHOLD = 400; // ms
+    const COMBO_THRESHOLD = 400; 
 
     document.addEventListener('keydown', (e) => {
       const key = e.key.toLowerCase();
       const now = Date.now();
       const isCombo = (now - lastTime) < COMBO_THRESHOLD;
 
-      // Ignore if typing in input
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
 
-      // Global Escapes
-      if (key === 'escape') { 
-        closeHelpModal();
-        closeDocModal(); 
-        closeDropdowns(); 
-        return; 
-      }
-
-      // Open Help (F1)
-      if (key === 'f1') { 
-        e.preventDefault(); // Prevent browser default help
-        openHelpModal(); 
-        return; 
-      }
-
-      // Open Toolbox
+      if (key === 'escape') { closeHelpModal(); closeDocModal(); closeDropdowns(); closeRouteModal(); return; }
+      if (key === 'f1') { e.preventDefault(); openHelpModal(); return; }
       if (key === '?') { e.preventDefault(); toggleDropdown(); return; }
-
-      // Actions
-      if (key === 'r' && !isCombo) { alert("Refresh triggered"); return; }
+      if (key === 'r' && !isCombo) { loadLatencyDeviationData(); return; }
       
-      // Number Keys
-      if (['1','2','3','4','5','6'].includes(key)) { 
-        e.preventDefault();
-        switchView(VIEWS[parseInt(key)-1]); 
-        return; 
-      }
-
-      // Arrow Navigation (Global)
+      if (['1','2','3','4','5','6'].includes(key)) { e.preventDefault(); switchView(VIEWS[parseInt(key)-1]); return; }
       if (key === 'arrowright') { currentViewIndex = (currentViewIndex + 1) % VIEWS.length; switchView(VIEWS[currentViewIndex]); return; }
       if (key === 'arrowleft') { currentViewIndex = (currentViewIndex - 1 + VIEWS.length) % VIEWS.length; switchView(VIEWS[currentViewIndex]); return; }
 
-      // Combo Logic (G + Key)
       if (isCombo && lastKey === 'g') {
         if (key === 'l') { switchView('latency'); }
         if (key === 'd') { switchView('distribution'); }
@@ -1108,12 +2133,7 @@
         return;
       }
 
-      // Ctrl/Cmd + E for Export
-      if ((e.ctrlKey || e.metaKey) && key === 'e') {
-        e.preventDefault();
-        triggerExport();
-        return;
-      }
+      if ((e.ctrlKey || e.metaKey) && key === 'e') { e.preventDefault(); triggerExport(); return; }
 
       lastKey = key;
       lastTime = now;
@@ -1126,6 +2146,19 @@
       renderRouteTable();
       renderMatrixTable();
       renderLatentResources();
+      renderToggleButtons();
+      renderRouteList();
+      
+      routeChart = new ZoomableChart('chart-route-container');
+      deviationChart = new ZoomableChart('chart-deviation-container');
+
+      window.addEventListener('resize', () => {
+          if (routeChart) { routeChart.resize(); routeChart.draw(); }
+          if (deviationChart) { deviationChart.resize(); deviationChart.draw(); }
+      });
+      
+      resolutionSelect.addEventListener('change', loadLatencyDeviationData);
+      loadLatencyDeviationData();
     });
   </script>
 </body>

@@ -8,6 +8,8 @@ Open Questions:
   - t-digest,
   - **HDR** Histogram.
 - How can we reason about the identifiability of the latent resource–route matrix?
+- An Analysis of - How Many Routes In this Window - Have Surpass the Expected Latency.
+- ...
 
 ## Formulation
 
@@ -138,6 +140,42 @@ Categories:
 - Latent & Causal Views (Congestion Inference, Causal Topology)
 - Observability & Statistical Views (Quantile Surfaces, Distributions, Variance)
 - Boundary & Informational Views (Survival/Hazard, Memory Decay)
+
+### Task Arrival
+
+> Task arrival is an extremely complex notion. For a deeper analysis of its ontic and epistemic dimensions, see [Task Time Arrival](https://www.notion.so/Task-Time-Arrival-331c0f5171ec8081aba6da90b6892946?source=copy_link).
+
+- What is a 'task arrival'? Shoudl we think about this a a process? or Phenomena? or even worse - a recording of af an underlyhign process -  or even wors - becuase it's a distributed ser of users - withtou actualy coordination, structure or  configuration - ...
+
+> How to represent task arrival? How used this representations? Which question sshould i be even be asking?
+
+> Which are the representations vies -  formulations - what does they encoded? Waht view of the pphenomena does they provided?
+
+Properties (Which are the objectives thing that can be said about arrivals?):
+
+- Arrival Distribution ? Does it even makes sense?
+- Expected Arrival  ...
+- Arrival Deviation ...
+- Burstiness Index ...
+- Temporal Dependency Structure
+- Conditional Arrival Rate
+- Count Distribution
+- Interarrival Distribution Shape
+- Entropy
+
+Re-Reprsentations:
+
+- Local Intensity Field
+- Spectral Representation
+- ...
+
+Patterns:
+
+- ...
+
+Information Encoded (Not as in Infortion Theory - But Meaning Encoded - That Drives Understanding - Action)
+
+- ...
 
 ### Time Resolution Route Level Latency Representation
 
