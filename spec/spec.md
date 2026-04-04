@@ -141,6 +141,19 @@ Categories:
 - Observability & Statistical Views (Quantile Surfaces, Distributions, Variance)
 - Boundary & Informational Views (Survival/Hazard, Memory Decay)
 
+- Overview
+- Latency
+  - System:  Latecy vs Workload
+  - System Elasticity
+  - Latency Distribution Dynamics
+  - Route Latency Distribution Dynamics
+- Task Arrival
+- Resource-Route Latent Interaction
+- Simulation
+  - Route Probabilty of Being Fire at Time T or Arrival Patterns - How many arrivals a time t, with probabilty?
+  - ...
+- ...
+
 ### Task Arrival
 
 > Task arrival is an extremely complex notion. For a deeper analysis of its ontic and epistemic dimensions, see [Task Time Arrival](https://www.notion.so/Task-Time-Arrival-331c0f5171ec8081aba6da90b6892946?source=copy_link).
@@ -153,10 +166,11 @@ Categories:
 
 Properties (Which are the objectives thing that can be said about arrivals?):
 
+- Burstiness Index ...
+
 - Arrival Distribution ? Does it even makes sense?
 - Expected Arrival  ...
 - Arrival Deviation ...
-- Burstiness Index ...
 - Temporal Dependency Structure
 - Conditional Arrival Rate
 - Count Distribution

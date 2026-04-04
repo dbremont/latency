@@ -1711,7 +1711,7 @@
       if (key === 'f1') { e.preventDefault(); openHelpModal(); return; }
       if (key === '?') { e.preventDefault(); toggleDropdown(); return; }
       if (key === 'r' && !isCombo) { loadLatencyDeviationData(); return; }
-      
+
       if (['1','2','3','4','5','6'].includes(key)) { e.preventDefault(); switchView(VIEWS[parseInt(key)-1]); return; }
       if (key === 'arrowright') { currentViewIndex = (currentViewIndex + 1) % VIEWS.length; switchView(VIEWS[currentViewIndex]); return; }
       if (key === 'arrowleft') { currentViewIndex = (currentViewIndex - 1 + VIEWS.length) % VIEWS.length; switchView(VIEWS[currentViewIndex]); return; }
