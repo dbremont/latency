@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Latency Modelling Specification</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@350;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #fafbfc;
+      --bg-alt: #f3f5f7;
+      --bg-elevated: #ffffff;
+      --fg: #0c1017;
+      --fg-secondary: #3d4852;
+      --fg-muted: #8795a1;
+      --fg-dim: #b8c4ce;
+      --accent: #0066ff;
+      --accent-muted: rgba(0, 102, 255, 0.08);
+      --accent-light: rgba(0, 102, 255, 0.04);
+      --warning: #f5a623;
+      --warning-light: rgba(245, 166, 35, 0.08);
+      --danger: #e53e3e;
+      --danger-light: rgba(229, 62, 62, 0.08);
+      --success: #0d9f6e;
+      --success-light: rgba(13, 159, 110, 0.08);
+      --border: #e8ecf0;
+      --border-subtle: #f0f3f6;
+      --border-strong: #d1d9e0;
+      --overlay: rgba(12, 16, 23, 0.5);
+      --shadow-sm: 0 1px 2px rgba(12, 16, 23, 0.04);
+      --shadow-md: 0 4px 12px rgba(12, 16, 23, 0.06);
+      --shadow-lg: 0 20px 40px rgba(12, 16, 23, 0.08);
+      --shadow-xl: 0 32px 64px rgba(12, 16, 23, 0.12);
+      --text-xs: 0.6875rem;
+      --text-sm: 0.8125rem;
+      --text-base: 0.9375rem;
+      --text-lg: 1.0625rem;
+      --text-xl: 1.375rem;
+      --text-2xl: 1.75rem;
+      --text-3xl: 2.25rem;
+      --text-4xl: 3rem;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html {
+      font-family: 'IBM Plex Sans', system-ui, sans-serif;
+      font-weight: 400;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+    }
+
+    .font-display { font-family: 'Space Grotesk', system-ui, sans-serif; letter-spacing: -0.02em; }
+    .font-mono { font-family: 'IBM Plex Mono', monospace; font-feature-settings: "tnum" on, "lnum" on, "zero" on, "ss01" on; }
+    
+    .heading-display { font-family: 'Space Grotesk', sans-serif; font-weight: 600; letter-spacing: -0.03em; line-height: 1.1; }
+    .heading-section { font-family: 'Space Grotesk', sans-serif; font-weight: 600; letter-spacing: -0.02em; line-height: 1.25; }
+    .label-caps { font-size: var(--text-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-muted); }
+    .label-micro { font-size: 0.625rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.1em; color: var(--fg-dim); }
+
+    .card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .card-metric {
+      background: linear-gradient(135deg, var(--bg-elevated) 0%, var(--bg) 100%);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      box-shadow: var(--shadow-sm);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .card-metric::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent); }
+
+    .nav-tab {
+      padding: 12px 20px;
+      font-size: var(--text-sm);
+      font-weight: 500;
+      color: var(--fg-muted);
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+      position: relative;
+    }
+
+    .nav-tab:hover { color: var(--fg-secondary); }
+
+    .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .nav-tab.active::after { content: ''; position: absolute; bottom: -1px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; background: var(--accent); border-radius: 50%; }
+    .nav-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 4px; }
+
+    .btn { padding: 10px 16px; font-size: var(--text-sm); font-weight: 500; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-elevated); color: var(--fg-secondary); cursor: pointer; transition: all 0.15s ease; box-shadow: var(--shadow-sm); }
+    .btn:hover { background: var(--bg); border-color: var(--border-strong); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+    .btn:active { transform: translateY(0); }
+    
+    .btn-ghost { display: inline-flex; align-items: center; justify-content: center; background: transparent; border: none; color: var(--fg-muted); padding: 8px; border-radius: 8px; cursor: pointer; transition: all 0.15s ease; }
+    .btn-ghost:hover { background: var(--bg-alt); color: var(--fg); }
+    .btn-ghost:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .chip { display: inline-flex; padding: 6px 14px; font-size: var(--text-xs); font-family: 'IBM Plex Mono', monospace; border-radius: 6px; background: var(--bg-alt); color: var(--fg-muted); border: 1px solid transparent; cursor: pointer; transition: all 0.15s ease; }
+    .chip:hover { color: var(--fg-secondary); background: var(--bg); border-color: var(--border); }
+    .chip.active { background: var(--accent-muted); color: var(--accent); border-color: rgba(0, 102, 255, 0.2); }
+
+    .data-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+    .data-table th { padding: 14px 16px; text-align: left; font-size: var(--text-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-muted); background: var(--bg-alt); border-bottom: 1px solid var(--border); }
+    .data-table td { padding: 14px 16px; border-bottom: 1px solid var(--border-subtle); }
+    .data-table tr:hover td { background: var(--bg-alt); }
+
+    .view-panel { display: none; }
+    .view-panel.active { display: block; }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-in { animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
+    .stagger-1 { animation-delay: 0.05s; }
+    .stagger-2 { animation-delay: 0.1s; }
+    .stagger-3 { animation-delay: 0.15s; }
+    .stagger-4 { animation-delay: 0.2s; }
+    .stagger-5 { animation-delay: 0.25s; }
+
+    @media (prefers-reduced-motion: reduce) { .animate-in { animation: none; opacity: 1; } }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--fg-muted); }
+
+    .section-title { font-family: 'Space Grotesk', sans-serif; font-size: var(--text-lg); font-weight: 600; color: var(--fg); letter-spacing: -0.01em; }
+    .section-subtitle { font-size: var(--text-sm); color: var(--fg-muted); margin-top: 4px; }
+    .divider { height: 1px; background: linear-gradient(90deg, transparent, var(--border), transparent); }
+    
+    .formula-block {
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 20px;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: var(--text-sm);
+      color: var(--fg-secondary);
+      overflow-x: auto;
+    }
+
+    .note-block {
+      border-left: 3px solid var(--accent);
+      background: var(--accent-light);
+      padding: 12px 16px;
+      border-radius: 0 8px 8px 0;
+      font-size: var(--text-sm);
+      color: var(--fg-secondary);
+      margin: 16px 0;
+    }
+
+    .question-card {
+      background: var(--warning-light);
+      border: 1px solid rgba(245, 166, 35, 0.2);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .question-card .q-title { font-weight: 600; color: var(--warning); font-size: var(--text-sm); margin-bottom: 4px; }
+    .question-card .q-body { font-size: var(--text-sm); color: var(--fg-secondary); }
+
+    .status-badge { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 24px; font-size: var(--text-xs); font-weight: 600; letter-spacing: 0.02em; }
+    .status-badge.success { background: var(--success-light); color: var(--success); }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; animation: statusPulse 2s infinite ease-in-out; }
+    @keyframes statusPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+    .definition-list { display: grid; gap: 12px; }
+    .definition-item { display: flex; gap: 12px; align-items: baseline; }
+    .definition-key { font-family: 'IBM Plex Mono', monospace; font-weight: 600; color: var(--accent); min-width: 40px; }
+    .definition-val { color: var(--fg-secondary); font-size: var(--text-sm); }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header class="bg-white/80 backdrop-blur-md border-b border-[var(--border-subtle)] sticky top-0 z-50">
+    <div class="max-w-[1440px] mx-auto px-8 md:px-20 lg:px-32 py-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="flex items-center gap-4">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--accent)] to-blue-700 flex items-center justify-center shadow-lg shadow-blue-500/20">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+          </div>
+          <div>
+            <h1 class="heading-display text-xl">Latency Modelling Specification</h1>
+            <p class="text-xs text-[var(--fg-muted)] font-mono tracking-wide">System Performance Framework v1.0</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <div class="status-badge success">
+            <span class="status-dot bg-[var(--success)]"></span>
+            <span>Reference Doc</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navigation -->
+  <nav class="bg-white/60 backdrop-blur-sm border-b border-[var(--border-subtle)] overflow-x-auto" aria-label="Main navigation">
+    <div class="max-w-[1440px] mx-auto px-8 md:px-20 lg:px-32">
+      <div class="flex">
+        <button class="nav-tab active" data-view="overview">Overview</button>
+        <button class="nav-tab" data-view="formulation">Formulation</button>
+        <button class="nav-tab" data-view="model">System Model</button>
+        <button class="nav-tab" data-view="representations">Representations</button>
+        <button class="nav-tab" data-view="metrics">Metrics</button>
+        <button class="nav-tab" data-view="matrix">Latent Matrix</button>
+        <button class="nav-tab" data-view="validation">Validation</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="max-w-[1440px] mx-auto px-8 md:px-20 lg:px-32 py-8">
+    
+    <!-- OVERVIEW VIEW -->
+    <div id="view-overview" class="view-panel active">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div class="lg:col-span-2 card p-6 animate-in stagger-1">
+          <h2 class="heading-section text-lg mb-3">Framework Goal</h2>
+          <p class="text-[var(--fg-secondary)] leading-relaxed mb-4">
+            This document defines a comprehensive framework for modeling, analyzing, and representing system latency. The goal is to construct a <strong>data-driven, explainable, and multi-resolution latency model</strong> that captures the behavior of requests across system routes, workloads, and resources.
+          </p>
+          <div class="flex gap-2 flex-wrap">
+            <span class="chip">Data-Driven</span>
+            <span class="chip">Explainable</span>
+            <span class="chip">Multi-Resolution</span>
+          </div>
+        </div>
+
+        <div class="card p-6 animate-in stagger-2">
+          <h3 class="label-caps mb-4">Target Resolutions</h3>
+          <div class="space-y-3 font-mono text-sm">
+            <div class="flex justify-between items-center"><span>Standard</span> <span class="text-[var(--fg-muted)]">1min, 5min, 10min</span></div>
+            <div class="flex justify-between items-center"><span>Extended</span> <span class="text-[var(--fg-muted)]">25min, 50min, 60min</span></div>
+            <div class="flex justify-between items-center"><span>Daily</span> <span class="text-[var(--fg-muted)]">1day</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-6 animate-in stagger-3">
+        <h2 class="section-title mb-4">Open Questions</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="question-card">
+            <div class="q-title">Consistency in Multi-Resolution</div>
+            <div class="q-body">How can we ensure P95 latency over one hour matches the P95 derived from the aggregation of 1‑minute buckets? (t-digest, HDR Histogram)</div>
+          </div>
+          <div class="question-card">
+            <div class="q-title">Latent Matrix Identifiability</div>
+            <div class="q-body">How can we reason about the identifiability of the latent resource–route matrix?</div>
+          </div>
+          <div class="question-card">
+            <div class="q-title">Surpass Analysis</div>
+            <div class="q-body">An Analysis of - How Many Routes In this Window - Have Surpass the Expected Latency.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FORMULATION VIEW -->
+    <div id="view-formulation" class="view-panel">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div class="card p-6 animate-in stagger-1">
+          <h2 class="section-title mb-2">Input Data Schema</h2>
+          <p class="section-subtitle mb-4">Observational data stored in CSV format</p>
+          <table class="data-table">
+            <thead>
+              <tr><th>Field</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="font-mono">TIME</td><td>Timestamp of the request</td></tr>
+              <tr><td class="font-mono">ROUTE</td><td>Endpoint or service identifier</td></tr>
+              <tr><td class="font-mono">DURATION</td><td>Request latency (ms)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card p-6 animate-in stagger-2">
+          <h2 class="section-title mb-2">Metric Output Schema</h2>
+          <p class="section-subtitle mb-4">Generic metric structure</p>
+          <table class="data-table">
+            <thead>
+              <tr><th>Field</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="font-mono">TIME</td><td>Aggregation timestamp (aligned)</td></tr>
+              <tr><td class="font-mono">VALUE</td><td>Metric computation result</td></tr>
+              <tr><td class="font-mono">WORKLOAD</td><td>Request volume in interval</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card p-6 mb-6 animate-in stagger-3">
+        <h2 class="section-title mb-2">Response Schema</h2>
+        
+        <div class="mb-6">
+          <h3 class="font-semibold text-[var(--fg-secondary)] mb-3">Route Level Data</h3>
+          <div class="overflow-x-auto">
+            <table class="data-table">
+              <thead>
+                <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>TIME</td><td>Timestamp</td><td>Window timestamp</td></tr>
+                <tr><td>ROUTE</td><td>String</td><td>Request route identifier</td></tr>
+                <tr><td>WORKLOAD</td><td>Integer</td><td>Total workload for window</td></tr>
+                <tr><td>OBSERVED</td><td>Dict</td><td>Computed stats (avg, p50, p75, var_log, max, p95)</td></tr>
+                <tr><td>EXPECTED</td><td>Dict</td><td>Historical stats (p50, p75, var_log)</td></tr>
+                <tr><td>DEVIATION</td><td>Float</td><td>Normalized (OBSERVED.avg - EXPECTED.p50) and log variance</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="font-semibold text-[var(--fg-secondary)] mb-3">System Wide Data</h3>
+          <table class="data-table">
+            <thead>
+              <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>TIME</td><td>Timestamp</td><td>Window timestamp</td></tr>
+              <tr><td>VALUE</td><td>Float</td><td>Workload-weighted expectation of route deviations</td></tr>
+              <tr><td>WORKLOAD</td><td>Integer</td><td>Total workload for window</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card p-6 border-l-4 border-l-[var(--danger)] animate-in stagger-4">
+        <h2 class="section-title text-[var(--danger)] mb-2">Data Quality: Right-Censoring</h2>
+        <p class="text-[var(--fg-secondary)] mb-4">The dataset exhibits right-censoring bias.</p>
+        <ul class="list-disc list-inside text-sm text-[var(--fg-secondary)] space-y-2">
+          <li>If a user cancels a request (due to latency), the request is not fully observed.</li>
+          <li>High-latency events are systematically underrepresented.</li>
+          <li>The observed distribution is truncated on the upper tail.</li>
+        </ul>
+        <div class="mt-4 p-3 rounded-lg bg-[var(--danger-light)] text-sm">
+          <strong>Consequences:</strong> Underestimation of mean/variance, distortion of tail quantiles (p95, p99), misleading worst-case analysis.
+        </div>
+      </div>
+    </div>
+
+    <!-- SYSTEM MODEL VIEW -->
+    <div id="view-model" class="view-panel">
+      <div class="card p-6 mb-6 animate-in stagger-1">
+        <h2 class="section-title mb-2">System Definition</h2>
+        <p class="section-subtitle mb-6">We define the system as a tuple of spaces and operators.</p>
+        
+        <div class="formula-block text-center text-lg mb-6">
+          M = (H, Z, E, W, T, C, P)
+        </div>
+
+        <div class="definition-list">
+          <div class="definition-item">
+            <div class="definition-key">H</div>
+            <div class="definition-val"><strong>History</strong> — sequences of past trajectories</div>
+          </div>
+          <div class="definition-item">
+            <div class="definition-key">Z</div>
+            <div class="definition-val"><strong>Latent Space</strong> — hidden internal factors (congestion, unserved work)</div>
+          </div>
+          <div class="definition-item">
+            <div class="definition-key">E</div>
+            <div class="definition-val"><strong>Environment</strong> — exogenous conditions</div>
+          </div>
+          <div class="definition-item">
+            <div class="definition-key">W</div>
+            <div class="definition-val"><strong>Workload Space</strong> — intensity, concurrency, pressure</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div class="card p-6 animate-in stagger-2">
+          <h3 class="font-semibold mb-4">History Process</h3>
+          <div class="formula-block mb-4">
+            H<sub>t</sub> ∈ H<br>
+            H<sub>t</sub> = {(S<sub>τ</sub>, Z<sub>τ</sub>, E<sub>τ</sub>, W<sub>τ</sub>) : τ ≤ t}
+          </div>
+          <p class="text-sm text-[var(--fg-muted)]">(H<sub>t</sub>) is the full system memory (grows with time).</p>
+        </div>
+
+        <div class="card p-6 animate-in stagger-3">
+          <h3 class="font-semibold mb-4">State Construction</h3>
+          <div class="formula-block mb-4">
+            S<sub>t</sub> = φ(H<sub>t</sub>)
+          </div>
+          <p class="text-sm text-[var(--fg-muted)]">φ: H → S is the history projection operator. S<sub>t</sub> is a lossy compression of H<sub>t</sub>.</p>
+        </div>
+      </div>
+
+      <div class="card p-6 mb-6 animate-in stagger-4">
+        <h3 class="font-semibold mb-4">Dynamics & Intrinsic Cost</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <div class="label-caps mb-2">Dynamics</div>
+            <div class="formula-block">
+              S<sub>t+1</sub> = T(H<sub>t</sub>, Z<sub>t</sub>, E<sub>t</sub>, W<sub>t</sub>)
+            </div>
+            <p class="text-sm text-[var(--fg-muted)] mt-2">The state is a sufficient statistic of all past evolution.</p>
+          </div>
+          <div>
+            <div class="label-caps mb-2">Intrinsic Cost (Latency)</div>
+            <div class="formula-block">
+              L<sub>t</sub> = C(S<sub>t</sub>, S<sub>t+1</sub>, Z<sub>t</sub>, E<sub>t</sub>, W<sub>t</sub>)
+            </div>
+            <p class="text-sm text-[var(--fg-muted)] mt-2">L<sub>t</sub> ∈ ℝ<sup>+</sup>. Represents the cost of transition under constraints.</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="note-block animate-in stagger-5">
+        <strong>Note:</strong> The system state is fully determined by its history and the environment. For implementation, an explicit state space may be introduced, but is not required for specification. A primary analysis strategy is simulation via generation of histories.
+      </div>
+    </div>
+
+    <!-- REPRESENTATIONS VIEW -->
+    <div id="view-representations" class="view-panel">
+      <div class="card p-6 mb-6 animate-in stagger-1">
+        <h2 class="section-title mb-4">Representation Categories</h2>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="p-4 rounded-lg bg-[var(--bg-alt)] border border-[var(--border)]">
+            <h4 class="font-semibold text-sm mb-2">State & Dynamics</h4>
+            <p class="text-xs text-[var(--fg-muted)]">Phase Space, Elasticity, Bifurcation</p>
+          </div>
+          <div class="p-4 rounded-lg bg-[var(--bg-alt)] border border-[var(--border)]">
+            <h4 class="font-semibold text-sm mb-2">Latent & Causal</h4>
+            <p class="text-xs text-[var(--fg-muted)]">Congestion Inference, Causal Topology</p>
+          </div>
+          <div class="p-4 rounded-lg bg-[var(--bg-alt)] border border-[var(--border)]">
+            <h4 class="font-semibold text-sm mb-2">Observability</h4>
+            <p class="text-xs text-[var(--fg-muted)]">Quantile Surfaces, Distributions, Variance</p>
+          </div>
+          <div class="p-4 rounded-lg bg-[var(--bg-alt)] border border-[var(--border)]">
+            <h4 class="font-semibold text-sm mb-2">Boundary & Info</h4>
+            <p class="text-xs text-[var(--fg-muted)]">Survival/Hazard, Memory Decay</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-6 mb-6 animate-in stagger-2">
+        <h2 class="section-title mb-2">Task Arrival</h2>
+        <p class="section-subtitle mb-4">Analysis of arrival processes and patterns.</p>
+        
+        <div class="note-block mb-4">
+          <strong>Ontological Question:</strong> Is 'task arrival' a process? A phenomena? A recording of an underlying process? Given it's a distributed set of users without coordination.
+        </div>
+
+        <h3 class="font-semibold text-[var(--fg-secondary)] mb-3">Properties</h3>
+        <div class="flex flex-wrap gap-2 mb-4">
+          <span class="chip">Burstiness Index</span>
+          <span class="chip">Expected Arrival</span>
+          <span class="chip">Arrival Deviation</span>
+          <span class="chip">Temporal Dependency</span>
+          <span class="chip">Conditional Rate</span>
+          <span class="chip">Interarrival Shape</span>
+          <span class="chip">Entropy</span>
+        </div>
+
+        <h3 class="font-semibold text-[var(--fg-secondary)] mb-3">Re-Representations</h3>
+        <div class="flex flex-wrap gap-2">
+          <span class="chip">Local Intensity Field</span>
+          <span class="chip">Spectral Representation</span>
+        </div>
+      </div>
+
+      <div class="card p-6 animate-in stagger-3">
+        <h2 class="section-title mb-2">Time Resolution Recasting</h2>
+        <p class="section-subtitle mb-4">Deriving metrics from 1min resolution data.</p>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div>
+            <h3 class="font-semibold text-[var(--fg-secondary)] mb-3">Questions</h3>
+            <ul class="space-y-2 text-sm text-[var(--fg-secondary)]">
+              <li>• How to derive Avg, P50, P75, Var-Log, Max from 1min data?</li>
+              <li>• How to check correctness of derived metrics?</li>
+              <li>• How to ensure P95(1h) matches P95(1min buckets)?</li>
+            </ul>
+          </div>
+          <div>
+            <h3 class="font-semibold text-[var(--fg-secondary)] mb-3">Evaluation Criteria</h3>
+            <ul class="space-y-2 text-sm text-[var(--fg-secondary)]">
+              <li>• <strong>Compression Ratio</strong>: Size vs original data.</li>
+              <li>• <strong>Consistency</strong>: Original P95 == Reconstructed P95.</li>
+              <li>• <strong>Efficiency</strong>: Computation time.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- METRICS VIEW -->
+    <div id="view-metrics" class="view-panel">
+      <div class="card p-6 mb-6 animate-in stagger-1">
+        <h2 class="section-title mb-4">Route Level Latency Metrics</h2>
+        
+        <div class="overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Metric</th>
+                <th>Description</th>
+                <th>Robustness</th>
+                <th>Interpretability</th>
+                <th>Sensitivity</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="font-mono">Average</td>
+                <td>Arithmetic mean of latency measurements</td>
+                <td><span class="text-[var(--danger)]">Low</span></td>
+                <td><span class="text-[var(--success)]">High</span></td>
+                <td><span class="text-[var(--warning)]">Medium</span></td>
+              </tr>
+              <tr>
+                <td class="font-mono">P50 (Median)</td>
+                <td>50th percentile, central value</td>
+                <td><span class="text-[var(--warning)]">Medium</span></td>
+                <td><span class="text-[var(--success)]">High</span></td>
+                <td><span class="text-[var(--warning)]">Medium</span></td>
+              </tr>
+              <tr>
+                <td class="font-mono">P95 Average</td>
+                <td>95th percentile, moderate tail behavior</td>
+                <td><span class="text-[var(--success)]">Medium-High</span></td>
+                <td><span class="text-[var(--success)]">High</span></td>
+                <td><span class="text-[var(--warning)]">Medium</span></td>
+              </tr>
+              <tr>
+                <td class="font-mono">Var Log-Latency</td>
+                <td>Variability in log-transformed latencies</td>
+                <td><span class="text-[var(--success)]">High</span></td>
+                <td><span class="text-[var(--warning)]">Medium</span></td>
+                <td><span class="text-[var(--success)]">High</span></td>
+              </tr>
+              <tr>
+                <td class="font-mono">Max Value</td>
+                <td>Maximum observed latency in interval</td>
+                <td><span class="text-[var(--danger)]">Low</span></td>
+                <td><span class="text-[var(--success)]">High</span></td>
+                <td><span class="text-[var(--danger)]">Low</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card p-6 animate-in stagger-2">
+        <h2 class="section-title mb-4">Metric Evaluation Criteria</h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <div class="p-4 rounded-lg bg-[var(--bg-alt)] border border-[var(--border)] mb-4">
+              <h4 class="font-semibold text-sm mb-2">Operational</h4>
+              <ul class="text-sm text-[var(--fg-secondary)] space-y-2">
+                <li>• <strong>Cold-Start Robustness</strong>: Valid outputs with insufficient history.</li>
+                <li>• <strong>Sensitivity to Spikes</strong>: Reflect extreme single requests.</li>
+                <li>• <strong>Sensitivity to Drift</strong>: React to gradual increases.</li>
+                <li>• <strong>Noise Robustness</strong>: Ignore normal small jitter.</li>
+              </ul>
+            </div>
+          </div>
+          <div>
+            <div class="p-4 rounded-lg bg-[var(--bg-alt)] border border-[var(--border)]">
+              <h4 class="font-semibold text-sm mb-2">Structural</h4>
+              <ul class="text-sm text-[var(--fg-secondary)] space-y-2">
+                <li>• <strong>Composability</strong>: Aggregation across routes, resampling.</li>
+                <li>• <strong>Interpretability</strong>: Maps to behavior, monotonic health relationship.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LATENT MATRIX VIEW -->
+    <div id="view-matrix" class="view-panel">
+      <div class="card p-6 mb-6 animate-in stagger-1">
+        <h2 class="section-title mb-2">Latent Share Resource Utilization Matrix</h2>
+        <p class="section-subtitle mb-4">
+          Each entry p<sub>t,r</sub> represents the pressure or utilization of latent resource r by task t.
+          Resources are abstract and learned from the model.
+        </p>
+        
+        <div class="note-block mb-4">
+          <strong>Strategy:</strong> Learn a latent resource–route interaction model to characterize how tasks engage system resources. Follows patterns in LDA, SEM, and low-rank models.
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Route (Task)</th>
+                <th>Latent R1</th>
+                <th>Latent R2</th>
+                <th>Latent R3</th>
+                <th>Latent R4</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="font-medium">Route 1</td>
+                <td class="font-mono text-[var(--accent)]">p<sub>1,1</sub></td>
+                <td class="font-mono text-[var(--accent)]">p<sub>2,1</sub></td>
+                <td class="font-mono text-[var(--accent)]">p<sub>3,1</sub></td>
+                <td class="font-mono text-[var(--accent)]">p<sub>4,1</sub></td>
+              </tr>
+              <tr>
+                <td class="font-medium">Route 2</td>
+                <td class="font-mono text-[var(--accent)]">p<sub>1,2</sub></td>
+                <td class="font-mono text-[var(--accent)]">p<sub>2,2</sub></td>
+                <td class="font-mono text-[var(--accent)]">p<sub>3,2</sub></td>
+                <td class="font-mono text-[var(--accent)]">p<sub>4,2</sub></td>
+              </tr>
+              <tr>
+                <td class="font-medium">Route 3</td>
+                <td class="font-mono text-[var(--accent)]">p<sub>1,3</sub></td>
+                <td class="font-mono text-[var(--accent)]">p<sub>2,3</sub></td>
+                <td class="font-mono text-[var(--accent)]">p<sub>3,3</sub></td>
+                <td class="font-mono text-[var(--accent)]">p<sub>4,3</sub></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="card p-6 animate-in stagger-2">
+          <h3 class="font-semibold mb-4">Problem Definition</h3>
+          <ul class="space-y-3 text-sm text-[var(--fg-secondary)]">
+            <li>• Produce representation to aid simulation of workload latency.</li>
+            <li>• For task set size n, there are 2<sup>n</sup> possible subsets (workload).</li>
+            <li>• Quantify task contribution to latency deviation.</li>
+            <li>• Analyze interaction (interference) between routes.</li>
+          </ul>
+        </div>
+        
+        <div class="card p-6 animate-in stagger-3">
+          <h3 class="font-semibold mb-4">Usage</h3>
+          <p class="text-sm text-[var(--fg-secondary)] mb-3">
+            The resulting matrix captures how each route contributes to latent resources. It can be used for:
+          </p>
+          <div class="flex flex-wrap gap-2">
+            <span class="chip">Diagnostic Analysis</span>
+            <span class="chip">Workload Optimization</span>
+            <span class="chip">Predictive Modeling</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VALIDATION VIEW -->
+    <div id="view-validation" class="view-panel">
+      <div class="card p-6 animate-in stagger-1">
+        <h2 class="section-title mb-4">Validation Strategy</h2>
+        <p class="text-[var(--fg-secondary)] mb-6">How to validate the resulting representations?</p>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div class="p-4 rounded-lg bg-[var(--success-light)] border border-[rgba(13,159,110,0.2)]">
+            <h4 class="font-semibold text-[var(--success)] mb-2">Consistency Checks</h4>
+            <p class="text-sm text-[var(--fg-secondary)]">
+              Verify that aggregated metrics (e.g., P95 over 1 hour) match those derived from finer resolutions (1-minute buckets).
+            </p>
+          </div>
+          
+          <div class="p-4 rounded-lg bg-[var(--accent-muted)] border border-[rgba(0,102,255,0.2)]">
+            <h4 class="font-semibold text-[var(--accent)] mb-2">Simulation Fidelity</h4>
+            <p class="text-sm text-[var(--fg-secondary)]">
+              Compare generated histories and evolutions against observed system behavior to validate the system model dynamics.
+            </p>
+          </div>
+          
+          <div class="p-4 rounded-lg bg-[var(--warning-light)] border border-[rgba(245,166,35,0.2)]">
+            <h4 class="font-semibold text-[var(--warning)] mb-2">Operational Testing</h4>
+            <p class="text-sm text-[var(--fg-secondary)]">
+              Evaluate metrics against cold-start robustness, noise sensitivity, and composability requirements.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-[var(--border-subtle)] mt-12">
+    <div class="max-w-[1440px] mx-auto px-8 md:px-20 lg:px-32 py-10">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+        
+        <div class="space-y-4">
+          <div class="label-caps">Model Signature</div>
+          <div class="p-4 rounded-xl bg-[var(--bg-alt)] border border-[var(--border)]">
+            <div class="font-mono text-sm text-[var(--fg-secondary)] leading-relaxed">
+              M = (H, Z, E, W, T, C, P)
+            </div>
+            <div class="divider my-3"></div>
+            <div class="text-xs text-[var(--fg-muted)] font-mono">
+              <span class="text-[var(--accent)]">H</span>istory · 
+              <span class="text-[var(--accent)]">Z</span>latent · 
+              <span class="text-[var(--accent)]">E</span>nvironment
+            </div>
+          </div>
+        </div>
+
+        <div class="text-center">
+          <div class="flex items-center justify-center gap-2 mb-4">
+            <div class="w-2 h-2 rounded-full bg-[var(--success)] animate-pulse"></div>
+            <span class="text-sm font-medium text-[var(--fg-secondary)]">Reference Specification</span>
+          </div>
+          <p class="text-sm text-[var(--fg-muted)]">
+            Latency Modelling Framework<br>
+            <span class="font-mono text-xs">v1.0</span>
+          </p>
+        </div>
+
+        <div class="text-right space-y-3">
+          <div class="label-caps">Scope</div>
+          <div class="text-sm text-[var(--fg-secondary)] font-mono space-y-1">
+            <div>Focus: <span class="text-[var(--accent)]">Latency Analysis</span></div>
+            <div>Type: <span class="text-[var(--fg)]">Technical Spec</span></div>
+          </div>
+        </div>
+
+      </div>
+      
+      <div class="divider mt-8 mb-4"></div>
+      
+      <div class="flex justify-between items-center text-xs text-[var(--fg-muted)]">
+        <span>Generated Documentation</span>
+        <span>Data-Driven System Analysis</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Simple Tab Switching Logic
+    document.addEventListener('DOMContentLoaded', () => {
+      const tabs = document.querySelectorAll('.nav-tab');
+      const panels = document.querySelectorAll('.view-panel');
+
+      tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          const targetView = tab.dataset.view;
+          
+          // Update tabs
+          tabs.forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          
+          // Update panels
+          panels.forEach(p => {
+            p.classList.remove('active');
+            if (p.id === `view-${targetView}`) {
+              p.classList.add('active');
+            }
+          });
+        });
+      });
+    });
+  </script>
+</body>
+</html>
