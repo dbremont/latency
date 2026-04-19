@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hawkes Process — Infinite Self-Exciting Simulation</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  :root{--bg:#07070D;--card:#0E0E1A;--accent:#FFA726;--accent-dim:rgba(255,167,38,0.12);--mint:#2EE8A0;--mint-dim:rgba(46,232,160,0.10);--red:#FF5252;--text:#D8D8E8;--muted:#5E5E78;--border:#1A1A2E;--gen0:#FFA726;--gen1:#2EE8A0;--gen2:#42A5F5;--gen3:#AB47BC;--gen4:#EC407A}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;overflow:hidden}
+  .mono{font-family:'JetBrains Mono',monospace}
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px}
+  .panel-title{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-bottom:10px}
+  canvas{display:block;width:100%;height:100%;border-radius:6px}
+  .slider-row{margin-bottom:12px}
+  .slider-row label{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;margin-bottom:3px;color:var(--text)}
+  .slider-row label .val{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);font-weight:500}
+  input[type=range]{-webkit-appearance:none;width:100%;height:5px;background:var(--border);border-radius:3px;outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);cursor:pointer;box-shadow:0 0 8px rgba(255,167,38,0.35)}
+  .stat-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:12px;border-bottom:1px solid var(--border)}
+  .stat-row:last-child{border-bottom:none}
+  .stat-label{color:var(--muted)}
+  .stat-val{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500}
+  .btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:12px;font-family:'Space Grotesk',sans-serif;cursor:pointer;transition:all .2s}
+  .btn:hover{border-color:var(--accent);background:var(--accent-dim)}
+  .btn.stop-btn{border-color:rgba(255,82,82,0.25)}
+  .btn.stop-btn:hover{background:rgba(255,82,82,0.08);border-color:var(--red)}
+  .btn.stop-btn.stopped{background:rgba(255,82,82,0.12);border-color:var(--red);color:var(--red)}
+  .gauge-bar{height:7px;border-radius:4px;background:var(--border);overflow:hidden}
+  .gauge-fill{height:100%;border-radius:4px;transition:width .4s,background .4s}
+  .gauge-markers{position:relative;height:18px;margin-top:2px}
+  .gauge-marker{position:absolute;top:0;width:1px;height:8px;background:var(--muted)}
+  .gauge-label{position:absolute;top:10px;font-size:8px;color:var(--muted);transform:translateX(-50%);font-family:'JetBrains Mono',monospace}
+  .math-block{background:rgba(255,167,38,0.04);border:1px solid rgba(255,167,38,0.10);border-radius:8px;padding:10px;margin-bottom:8px;text-align:center;overflow-x:auto}
+  .insight-box{background:var(--mint-dim);border:1px solid rgba(46,232,160,0.15);border-radius:8px;padding:10px;font-size:11px;line-height:1.6;color:var(--text)}
+  .insight-box strong{color:var(--mint)}
+  .legend-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:3px;vertical-align:middle}
+  .aside-scroll::-webkit-scrollbar{width:3px}
+  .aside-scroll::-webkit-scrollbar-track{background:transparent}
+  .aside-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+  .status-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;font-family:'JetBrains Mono',monospace}
+  .status-pill .dot{width:6px;height:6px;border-radius:50%}
+  .status-playing{background:rgba(46,232,160,0.1);color:var(--mint)}
+  .status-playing .dot{background:var(--mint);animation:blink 1.2s infinite}
+  .status-paused{background:rgba(255,167,38,0.1);color:var(--accent)}
+  .status-paused .dot{background:var(--accent)}
+  .status-stopped{background:rgba(255,82,82,0.1);color:var(--red)}
+  .status-stopped .dot{background:var(--red)}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+  @media(prefers-reduced-motion:reduce){.status-playing .dot{animation:none}.gauge-fill{transition:none}}
+  @media(max-width:900px){.main-layout{flex-direction:column!important}.left-panel{width:100%!important;max-height:35vh}.right-panel{min-height:55vh}}
+</style>
+</head>
+<body>
+<div style="position:fixed;inset:0;pointer-events:none;z-index:0;">
+  <div style="position:absolute;top:-15%;left:-5%;width:400px;height:400px;background:radial-gradient(circle,rgba(255,167,38,0.035),transparent 70%)"></div>
+  <div style="position:absolute;bottom:-10%;right:-5%;width:500px;height:500px;background:radial-gradient(circle,rgba(46,232,160,0.025),transparent 70%)"></div>
+</div>
+<div style="position:relative;z-index:1;height:100vh;display:flex;flex-direction:column;">
+
+<header style="border-bottom:1px solid var(--border);flex-shrink:0;">
+  <div style="max-width:1600px;margin:0 auto;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="width:30px;height:30px;border-radius:7px;background:var(--accent-dim);border:1px solid rgba(255,167,38,0.2);display:flex;align-items:center;justify-content:center"><i class="fas fa-bolt" style="color:var(--accent);font-size:13px"></i></div>
+      <div>
+        <h1 style="font-size:16px;font-weight:700;line-height:1.2">The Hawkes Process</h1>
+        <p style="font-size:10px;color:var(--muted);letter-spacing:.5px">Infinite Self-Exciting Simulation</p>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+      <span class="status-pill status-playing" id="statusPill"><span class="dot"></span><span id="statusText">STREAMING</span></span>
+      <button class="btn" id="playBtn" onclick="togglePlay()" aria-label="Play or Pause"><i class="fas fa-pause" id="playIcon"></i><span id="playLabel">Pause</span></button>
+      <button class="btn stop-btn" id="stopBtn" onclick="stopSim()" aria-label="Stop"><i class="fas fa-stop"></i>Stop</button>
+      <button class="btn" onclick="resetSim()" aria-label="New simulation"><i class="fas fa-rotate"></i>New</button>
+      <div style="display:flex;align-items:center;gap:5px;margin-left:4px">
+        <span style="font-size:10px;color:var(--muted)">Speed</span>
+        <input type="range" id="speedSlider" min="0.2" max="8" step="0.1" value="2" style="width:70px" aria-label="Speed">
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="main-layout" style="flex:1;display:flex;gap:0;overflow:hidden;">
+
+<aside class="left-panel aside-scroll" style="width:290px;flex-shrink:0;overflow-y:auto;padding:12px;border-right:1px solid var(--border);display:flex;flex-direction:column;gap:10px;">
+
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-square-root-variable" style="margin-right:3px"></i> Formulation</div>
+    <div class="math-block" id="math1"></div>
+    <div class="math-block" id="math2"></div>
+    <div class="math-block" id="math3"></div>
+    <p style="font-size:10px;color:var(--muted);line-height:1.5;margin-top:4px">Each event at <span class="mono" style="color:var(--accent)">t<sub>i</sub></span> adds <span class="mono" style="color:var(--mint)">&alpha;e<sup>-&beta;(t-t<sub>i</sub>)</sup></span> to the intensity — a jolt that decays exponentially.</p>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-sliders" style="margin-right:3px"></i> Parameters</div>
+    <div class="slider-row">
+      <label>Background rate <span class="val">&mu; = <span id="muVal">0.20</span></span></label>
+      <input type="range" id="muSlider" min="0.05" max="2" step="0.05" value="0.2">
+    </div>
+    <div class="slider-row">
+      <label>Excitation <span class="val">&alpha; = <span id="alphaVal">1.00</span></span></label>
+      <input type="range" id="alphaSlider" min="0.05" max="3" step="0.05" value="1.0">
+    </div>
+    <div class="slider-row">
+      <label>Decay rate <span class="val">&beta; = <span id="betaVal">1.20</span></span></label>
+      <input type="range" id="betaSlider" min="0.2" max="5" step="0.05" value="1.2">
+    </div>
+    <div class="slider-row" style="margin-bottom:0">
+      <label>Visible window <span class="val">W = <span id="windowVal">40</span></span></label>
+      <input type="range" id="windowSlider" min="10" max="120" step="5" value="40">
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-diagram-project" style="margin-right:3px"></i> Branching Ratio</div>
+    <div style="display:flex;align-items:baseline;gap:5px;margin-bottom:6px">
+      <span style="font-size:20px;font-weight:700" class="mono" id="nStarVal">0.83</span>
+      <span style="font-size:10px;color:var(--muted)">= &alpha;/&beta;</span>
+      <span id="stabilityBadge" style="margin-left:auto;font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:rgba(255,167,38,0.12);color:var(--accent)">NEAR-CRITICAL</span>
+    </div>
+    <div class="gauge-bar"><div class="gauge-fill" id="gaugeFill" style="width:41.5%;background:var(--accent)"></div></div>
+    <div class="gauge-markers">
+      <div class="gauge-marker" style="left:50%"></div>
+      <span class="gauge-label" style="left:50%">n*=1</span>
+      <span class="gauge-label" style="left:0">0</span>
+      <span class="gauge-label" style="left:100%">2</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-chart-area" style="margin-right:3px"></i> Excitation Kernel</div>
+    <div style="height:75px;position:relative"><canvas id="kernelCanvas"></canvas></div>
+    <p style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5">After each event, intensity jumps by <span class="mono" style="color:var(--accent)">&alpha;</span>, then decays with half-life <span class="mono" style="color:var(--mint)">ln2/&beta; = <span id="halflifeVal">0.58</span></span></p>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><i class="fas fa-chart-bar" style="margin-right:3px"></i> Live Statistics</div>
+    <div class="stat-row"><span class="stat-label">Simulation time</span><span class="stat-val" id="statTime" style="color:var(--text)">0.0</span></div>
+    <div class="stat-row"><span class="stat-label">Total Hawkes events</span><span class="stat-val" id="statHawkes" style="color:var(--accent)">0</span></div>
+    <div class="stat-row"><span class="stat-label">Immigrants (gen 0)</span><span class="stat-val" id="statImmigrants" style="color:var(--gen0)">0</span></div>
+    <div class="stat-row"><span class="stat-label">Offspring (gen 1+)</span><span class="stat-val" id="statOffspring" style="color:var(--gen1)">0</span></div>
+    <div class="stat-row"><span class="stat-label">Current &lambda;(t)</span><span class="stat-val" id="statLambda" style="color:var(--accent)">0.20</span></div>
+    <div class="stat-row"><span class="stat-label">Peak &lambda; in window</span><span class="stat-val" id="statPeak">—</span></div>
+    <div class="stat-row"><span class="stat-label">Poisson events in window</span><span class="stat-val" id="statPoisson" style="color:#7878A0">0</span></div>
+    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;font-size:10px;color:var(--muted)">
+      <span><span class="legend-dot" style="background:var(--gen0)"></span>Gen 0</span>
+      <span><span class="legend-dot" style="background:var(--gen1)"></span>Gen 1</span>
+      <span><span class="legend-dot" style="background:var(--gen2)"></span>Gen 2</span>
+      <span><span class="legend-dot" style="background:var(--gen3)"></span>Gen 3</span>
+      <span><span class="legend-dot" style="background:var(--gen4)"></span>Gen 4+</span>
+    </div>
+  </div>
+
+  <div class="insight-box">
+    <strong>Why it clusters:</strong> Each event "excites" the process, temporarily raising &lambda;(t). This makes subsequent events more likely right after a previous one — creating bursts. Compare the Hawkes timeline (colorful, clustered) with the Poisson (gray, uniform).
+  </div>
+</aside>
+
+<div class="right-panel" style="flex:1;display:flex;flex-direction:column;padding:12px;gap:10px;min-width:0;">
+
+  <div class="panel" style="flex:1.4;display:flex;flex-direction:column;min-height:0">
+    <div class="panel-title" style="flex-shrink:0"><i class="fas fa-wave-square" style="margin-right:3px"></i> Conditional Intensity &lambda;(t) &mdash; spikes at each event, then decays</div>
+    <div style="flex:1;min-height:0;position:relative"><canvas id="intensityCanvas"></canvas></div>
+  </div>
+
+  <div class="panel" style="flex:1;display:flex;flex-direction:column;min-height:0">
+    <div class="panel-title" style="flex-shrink:0"><i class="fas fa-timeline" style="margin-right:3px"></i> Event Timeline &mdash; Hawkes Cascade vs. Homogeneous Poisson</div>
+    <div style="flex:1;min-height:0;position:relative"><canvas id="timelineCanvas"></canvas></div>
+  </div>
+</div>
+</main>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   INFINITE HAWKES PROCESS — Streaming Simulation
+   Events generated on-the-fly via Ogata thinning.
+   Sliding window visualization that never stops rendering.
+   ═══════════════════════════════════════════════════════ */
+
+const GEN_COLORS = ['#FFA726','#2EE8A0','#42A5F5','#AB47BC','#EC407A'];
+
+// ─── Parameters & State ──────────────────────────────────────────
+let params = { mu: 0.2, alpha: 1.0, beta: 1.2 };
+let WINDOW_WIDTH = 40;
+const BUFFER_AHEAD = 20;
+
+let events = [];
+let poissonEvents = [];
+let simTime = 0;
+let thinTime = 0;
+let poissonThinTime = 0;
+let simState = 'playing'; // 'playing' | 'paused' | 'stopped'
+let ambientPhase = 0;
+let lastFrameTime = null;
+let animSpeed = 2;
+let statsCounter = 0;
+
+// ─── Safe arc helper — never negative radius ─────────────────────
+function safeArc(ctx, x, y, r, startAngle, endAngle) {
+  ctx.arc(x, y, Math.max(0.1, r), startAngle, endAngle);
+}
+
+// ─── Intensity computation (only past events, with cutoff) ───────
+function computeIntensityAt(t) {
+  let lam = params.mu;
+  const cutoff = 12 / params.beta;
+  for (let i = events.length - 1; i >= 0; i--) {
+    const dt = t - events[i].time;
+    if (dt <= 0) continue; // future events don't count
+    if (dt > cutoff) break;
+    lam += params.alpha * Math.exp(-params.beta * dt);
+  }
+  return lam;
+}
+
+// Intensity right after event at index idx (includes the jump)
+function intensityAfterIdx(idx) {
+  const ev = events[idx];
+  let lam = params.mu;
+  const cutoff = 12 / params.beta;
+  for (let j = idx; j >= 0; j--) {
+    const dt = ev.time - events[j].time;
+    if (dt > cutoff) break;
+    lam += params.alpha * Math.exp(-params.beta * dt);
+  }
+  return lam;
+}
+
+// ─── Determine parent of a new event ─────────────────────────────
+function determineParent(t) {
+  const contribs = [{ idx: -1, w: params.mu }];
+  const cutoff = 12 / params.beta;
+  for (let i = events.length - 1; i >= 0; i--) {
+    const dt = t - events[i].time;
+    if (dt <= 0) continue;
+    if (dt > cutoff) break;
+    contribs.push({ idx: i, w: params.alpha * Math.exp(-params.beta * dt) });
+  }
+  const total = contribs.reduce((s, c) => s + c.w, 0);
+  let r = Math.random() * total, cum = 0;
+  for (const c of contribs) { cum += c.w; if (r <= cum) return c.idx; }
+  return -1;
+}
+
+// ─── Incremental Ogata Thinning ──────────────────────────────────
+function advanceThinning() {
+  const targetEnd = simTime + BUFFER_AHEAD;
+  const maxPerCall = 200;
+  let generated = 0;
+
+  while (thinTime < targetEnd && generated < maxPerCall) {
+    let M = params.mu;
+    const cutoff = 12 / params.beta;
+    for (let i = events.length - 1; i >= 0; i--) {
+      const dt = thinTime - events[i].time;
+      if (dt <= 0) continue;
+      if (dt > cutoff) break;
+      M += params.alpha * Math.exp(-params.beta * dt);
+    }
+    if (M <= 1e-12) { thinTime += 0.5; continue; }
+
+    const s = -Math.log(Math.random()) / M;
+    const tCand = thinTime + s;
+
+    let lamCand = params.mu;
+    for (let i = events.length - 1; i >= 0; i--) {
+      const dt = tCand - events[i].time;
+      if (dt <= 0) break;
+      if (dt > cutoff) break;
+      lamCand += params.alpha * Math.exp(-params.beta * dt);
+    }
+
+    if (Math.random() <= lamCand / M) {
+      const parent = determineParent(tCand);
+      const generation = parent === -1 ? 0 : events[parent].generation + 1;
+      events.push({ time: tCand, intensity: lamCand, parent, generation, intensityAfter: 0 });
+      events[events.length - 1].intensityAfter = intensityAfterIdx(events.length - 1);
+      generated++;
+    }
+    thinTime = tCand;
+  }
+}
+
+// ─── Incremental Poisson generation ──────────────────────────────
+function advancePoisson() {
+  const targetEnd = simTime + BUFFER_AHEAD;
+  while (poissonThinTime < targetEnd) {
+    const s = -Math.log(Math.random()) / Math.max(params.mu, 0.001);
+    const nextTime = poissonThinTime + s;
+    if (nextTime <= targetEnd) {
+      poissonEvents.push({ time: nextTime });
+    }
+    poissonThinTime = nextTime;
+  }
+}
+
+// ─── Reset ───────────────────────────────────────────────────────
+function resetSim() {
+  events = [];
+  poissonEvents = [];
+  simTime = 0;
+  thinTime = 0;
+  poissonThinTime = 0;
+  lastFrameTime = null;
+  simState = 'playing';
+  updateUI();
+}
+
+// ─── Controls ────────────────────────────────────────────────────
+function togglePlay() {
+  if (simState === 'stopped') {
+    simState = 'playing';
+    lastFrameTime = null;
+  } else if (simState === 'playing') {
+    simState = 'paused';
+  } else {
+    simState = 'playing';
+    lastFrameTime = null;
+  }
+  updateUI();
+}
+
+function stopSim() {
+  if (simState === 'stopped') {
+    resetSim();
+    return;
+  }
+  simState = 'stopped';
+  updateUI();
+}
+
+function updateUI() {
+  const icon = document.getElementById('playIcon');
+  const label = document.getElementById('playLabel');
+  const pill = document.getElementById('statusPill');
+  const statusText = document.getElementById('statusText');
+  const stopBtn = document.getElementById('stopBtn');
+
+  pill.className = 'status-pill';
+  stopBtn.classList.remove('stopped');
+
+  switch (simState) {
+    case 'playing':
+      icon.className = 'fas fa-pause';
+      label.textContent = 'Pause';
+      pill.classList.add('status-playing');
+      statusText.textContent = 'STREAMING';
+      break;
+    case 'paused':
+      icon.className = 'fas fa-play';
+      label.textContent = 'Resume';
+      pill.classList.add('status-paused');
+      statusText.textContent = 'PAUSED';
+      break;
+    case 'stopped':
+      icon.className = 'fas fa-play';
+      label.textContent = 'Resume';
+      pill.classList.add('status-stopped');
+      statusText.textContent = 'STOPPED';
+      stopBtn.classList.add('stopped');
+      break;
+  }
+}
+
+// ─── Canvas setup ────────────────────────────────────────────────
+function setupCanvas(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const w = rect.width, h = rect.height;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w, h };
+}
+
+// ─── Visible window bounds ───────────────────────────────────────
+// The right edge of the window IS simTime. Only events at or before
+// simTime are shown — buffer events ahead are invisible until reached.
+function getWindowBounds() {
+  const wEnd = Math.max(WINDOW_WIDTH, simTime);
+  const wStart = wEnd - WINDOW_WIDTH;
+  return { wStart, wEnd };
+}
+
+// ─── Draw Kernel ─────────────────────────────────────────────────
+function drawKernel() {
+  const canvas = document.getElementById('kernelCanvas');
+  const { ctx, w, h } = setupCanvas(canvas);
+  const { alpha, beta } = params;
+  const tauMax = Math.max(5 / beta, 1);
+  const pad = { l: 28, r: 6, t: 4, b: 14 };
+  const pw = w - pad.l - pad.r, ph = h - pad.t - pad.b;
+  const xS = tau => pad.l + (tau / tauMax) * pw;
+  const yS = v => pad.t + ph - (v / Math.max(alpha, 0.1)) * ph;
+
+  ctx.fillStyle = '#08080F'; ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = '#1A1A2E'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, pad.t + ph); ctx.lineTo(pad.l + pw, pad.t + ph); ctx.stroke();
+
+  ctx.beginPath(); ctx.moveTo(xS(0), yS(0));
+  for (let i = 0; i <= 80; i++) { const tau = (i / 80) * tauMax; ctx.lineTo(xS(tau), yS(alpha * Math.exp(-beta * tau))); }
+  ctx.lineTo(xS(tauMax), yS(0)); ctx.closePath();
+  const grad = ctx.createLinearGradient(0, pad.t, 0, pad.t + ph);
+  grad.addColorStop(0, 'rgba(255,167,38,0.2)'); grad.addColorStop(1, 'rgba(255,167,38,0.01)');
+  ctx.fillStyle = grad; ctx.fill();
+
+  ctx.beginPath();
+  for (let i = 0; i <= 80; i++) { const tau = (i / 80) * tauMax; const x = xS(tau), y = yS(alpha * Math.exp(-beta * tau)); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+  ctx.strokeStyle = '#FFA726'; ctx.lineWidth = 2; ctx.stroke();
+
+  ctx.fillStyle = '#5E5E78'; ctx.font = '8px JetBrains Mono'; ctx.textAlign = 'center'; ctx.fillText('\u03C4', pad.l + pw / 2, h - 1);
+  ctx.textAlign = 'right'; ctx.fillText('\u03B1', pad.l - 3, yS(alpha) + 3); ctx.fillText('0', pad.l - 3, yS(0) + 3);
+
+  const hl = Math.log(2) / beta;
+  if (hl < tauMax) {
+    const xh = xS(hl);
+    ctx.setLineDash([2, 2]); ctx.strokeStyle = 'rgba(46,232,160,0.4)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(xh, pad.t); ctx.lineTo(xh, pad.t + ph); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#2EE8A0'; ctx.font = '7px JetBrains Mono'; ctx.textAlign = 'center'; ctx.fillText('t\u00BD', xh, h - 1);
+  }
+  document.getElementById('halflifeVal').textContent = hl.toFixed(2);
+}
+
+// ─── Draw Intensity Plot ─────────────────────────────────────────
+function drawIntensity(phase) {
+  const canvas = document.getElementById('intensityCanvas');
+  const { ctx, w, h } = setupCanvas(canvas);
+  const { mu } = params;
+  const { wStart, wEnd } = getWindowBounds();
+  const wWidth = wEnd - wStart;
+  const pad = { left: 48, right: 16, top: 14, bottom: 24 };
+  const pw = w - pad.left - pad.right;
+  const ph = h - pad.top - pad.bottom;
+
+  const xS = t => pad.left + ((t - wStart) / wWidth) * pw;
+
+  // ── Compute intensity grid for visible window ──
+  // CRITICAL: only include events that simTime has reached (ev.time <= simTime)
+  const visibleEvents = events.filter(e => e.time >= wStart && e.time <= simTime);
+  const gridN = 300;
+  const dt = wWidth / gridN;
+  const eps = dt * 0.01;
+
+  const tSet = new Set();
+  for (let i = 0; i <= gridN; i++) tSet.add(wStart + i * dt);
+  for (const ev of visibleEvents) {
+    tSet.add(Math.max(wStart, ev.time - eps));
+    tSet.add(Math.min(simTime, ev.time + eps));
+  }
+  // Ensure simTime is in the grid for the cursor
+  if (simTime >= wStart && simTime <= wEnd) tSet.add(simTime);
+
+  const gridTimes = [...tSet].sort((a, b) => a - b);
+
+  const grid = [];
+  let yMax = mu * 2;
+  for (const t of gridTimes) {
+    if (t < wStart || t > wEnd) continue;
+    const lam = computeIntensityAt(t);
+    grid.push({ t, lambda: lam });
+    if (lam > yMax) yMax = lam;
+  }
+  yMax = yMax * 1.15;
+
+  const yS = l => pad.top + ph - (l / yMax) * ph;
+
+  // Background
+  ctx.fillStyle = '#08080F'; ctx.fillRect(0, 0, w, h);
+
+  // Y grid
+  const yTicks = 5;
+  for (let i = 0; i <= yTicks; i++) {
+    const val = (yMax / yTicks) * i;
+    const y = yS(val);
+    ctx.strokeStyle = '#141425'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(w - pad.right, y); ctx.stroke();
+    ctx.fillStyle = '#4A4A64'; ctx.font = '9px JetBrains Mono'; ctx.textAlign = 'right';
+    ctx.fillText(val.toFixed(1), pad.left - 5, y + 3);
+  }
+
+  // X grid
+  const xStep = wWidth > 60 ? 10 : 5;
+  const xStart = Math.ceil(wStart / xStep) * xStep;
+  for (let t = xStart; t <= wEnd; t += xStep) {
+    const x = xS(t);
+    ctx.strokeStyle = '#141425'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + ph); ctx.stroke();
+    ctx.fillStyle = '#4A4A64'; ctx.font = '9px JetBrains Mono'; ctx.textAlign = 'center';
+    ctx.fillText(t.toFixed(0), x, h - 6);
+  }
+
+  // Poisson baseline
+  const muY = yS(mu);
+  ctx.save(); ctx.setLineDash([6, 4]); ctx.strokeStyle = 'rgba(120,120,160,0.3)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(pad.left, muY); ctx.lineTo(w - pad.right, muY); ctx.stroke(); ctx.restore();
+  ctx.fillStyle = 'rgba(120,120,160,0.45)'; ctx.font = '9px Space Grotesk'; ctx.textAlign = 'left';
+  ctx.fillText('Poisson \u03BB = \u03BC', pad.left + 4, muY - 5);
+
+  // ── Clip rendering to simTime (don't show the future) ──
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(pad.left, pad.top - 2, xS(simTime) - pad.left, ph + 4);
+  ctx.clip();
+
+  // Area fill under curve
+  if (grid.length > 1) {
+    ctx.beginPath(); ctx.moveTo(xS(grid[0].t), yS(0));
+    for (const pt of grid) ctx.lineTo(xS(pt.t), yS(pt.lambda));
+    ctx.lineTo(xS(grid[grid.length - 1].t), yS(0)); ctx.closePath();
+    const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + ph);
+    grad.addColorStop(0, 'rgba(255,167,38,0.14)'); grad.addColorStop(0.5, 'rgba(255,167,38,0.04)'); grad.addColorStop(1, 'rgba(255,167,38,0.0)');
+    ctx.fillStyle = grad; ctx.fill();
+
+    // Glow passes
+    const passes = [{ w: 10, a: 0.03 }, { w: 5, a: 0.1 }, { w: 2.5, a: 0.35 }, { w: 1.2, a: 1.0 }];
+    for (const pass of passes) {
+      ctx.beginPath(); ctx.strokeStyle = `rgba(255,167,38,${pass.a})`; ctx.lineWidth = pass.w; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      for (let i = 0; i < grid.length; i++) { const x = xS(grid[i].t), y = yS(grid[i].lambda); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+      ctx.stroke();
+    }
+  }
+
+  // Event tick lines
+  for (const ev of visibleEvents) {
+    const x = xS(ev.time);
+    ctx.strokeStyle = 'rgba(255,167,38,0.12)'; ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + ph); ctx.stroke();
+  }
+
+  // Event dots on curve (at post-jump intensity)
+  // age = simTime - ev.time is always >= 0 because we filtered ev.time <= simTime
+  const breathe = Math.sin(phase * 2) * 0.4;
+  for (const ev of visibleEvents) {
+    const x = xS(ev.time);
+    const y = yS(ev.intensityAfter);
+    const genColor = GEN_COLORS[Math.min(ev.generation, GEN_COLORS.length - 1)];
+    const age = simTime - ev.time; // always >= 0
+    const baseR = age < 1.0 ? 3 + (1 - age) * 4 : 3;
+    const r = Math.max(0.5, baseR + (age > 2 ? breathe : 0));
+
+    // Glow
+    ctx.beginPath(); safeArc(ctx, x, y, r + 3, 0, Math.PI * 2);
+    ctx.fillStyle = genColor + '18'; ctx.fill();
+
+    // Dot
+    ctx.beginPath(); safeArc(ctx, x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = genColor; ctx.fill();
+    ctx.strokeStyle = '#08080F'; ctx.lineWidth = 0.8; ctx.stroke();
+
+    // Flash for new events
+    if (age < 1.2) {
+      const p = age / 1.2;
+      const flashR = Math.max(0.5, r + 16 * p);
+      ctx.beginPath(); safeArc(ctx, x, y, flashR, 0, Math.PI * 2);
+      const flashAlpha = Math.round((1 - p) * 50).toString(16).padStart(2, '0');
+      ctx.fillStyle = genColor + flashAlpha; ctx.fill();
+    }
+  }
+
+  ctx.restore(); // remove clip
+
+  // Current time cursor
+  if (simTime > wStart && simTime <= wEnd) {
+    const x = xS(simTime);
+    const curLam = computeIntensityAt(simTime);
+    const dotY = yS(curLam);
+
+    ctx.strokeStyle = 'rgba(255,167,38,0.45)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + ph); ctx.stroke(); ctx.setLineDash([]);
+
+    ctx.beginPath(); safeArc(ctx, x, dotY, 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFA726'; ctx.fill();
+    ctx.strokeStyle = '#08080F'; ctx.lineWidth = 1.5; ctx.stroke();
+
+    ctx.fillStyle = '#FFA726'; ctx.font = '500 10px JetBrains Mono'; ctx.textAlign = 'left';
+    ctx.fillText('\u03BB=' + curLam.toFixed(2), x + 6, dotY - 6);
+  }
+
+  // Axis label
+  ctx.fillStyle = '#5E5E78'; ctx.font = '9px Space Grotesk'; ctx.textAlign = 'center';
+  ctx.fillText('t', pad.left + pw / 2, h - 0);
+}
+
+// ─── Draw Timeline ───────────────────────────────────────────────
+function drawTimeline(phase) {
+  const canvas = document.getElementById('timelineCanvas');
+  const { ctx, w, h } = setupCanvas(canvas);
+  const { wStart, wEnd } = getWindowBounds();
+  const wWidth = wEnd - wStart;
+  const pad = { left: 48, right: 16, top: 10, bottom: 8 };
+  const pw = w - pad.left - pad.right;
+  const sectionH = (h - pad.top - pad.bottom) / 2;
+  const hawkesY = pad.top + sectionH * 0.5;
+  const poissonY = pad.top + sectionH * 1.5;
+  const xS = t => pad.left + ((t - wStart) / wWidth) * pw;
+
+  ctx.fillStyle = '#08080F'; ctx.fillRect(0, 0, w, h);
+
+  // Time grid
+  const xStep = wWidth > 60 ? 10 : 5;
+  const xStart = Math.ceil(wStart / xStep) * xStep;
+  ctx.strokeStyle = '#141425'; ctx.lineWidth = 1;
+  for (let t = xStart; t <= wEnd; t += xStep) { const x = xS(t); ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, h - pad.bottom); ctx.stroke(); }
+
+  // Divider
+  ctx.strokeStyle = '#1A1A2E'; ctx.beginPath(); ctx.moveTo(pad.left, pad.top + sectionH); ctx.lineTo(w - pad.right, pad.top + sectionH); ctx.stroke();
+
+  // Labels
+  ctx.fillStyle = '#FFA726'; ctx.font = '600 9px Space Grotesk'; ctx.textAlign = 'right'; ctx.fillText('HAWKES', pad.left - 5, hawkesY + 3);
+  ctx.fillStyle = '#5E5E78'; ctx.fillText('POISSON', pad.left - 5, poissonY + 3);
+
+  // Baselines
+  ctx.strokeStyle = '#1A1A2E'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.left, hawkesY); ctx.lineTo(w - pad.right, hawkesY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(pad.left, poissonY); ctx.lineTo(w - pad.right, poissonY); ctx.stroke();
+
+  // Time labels
+  ctx.fillStyle = '#4A4A64'; ctx.font = '8px JetBrains Mono'; ctx.textAlign = 'center';
+  for (let t = xStart; t <= wEnd; t += xStep) ctx.fillText(t.toFixed(0), xS(t), h - 0);
+
+  // ── Only show events that simTime has reached ──
+  const visHawkes = events.filter(e => e.time >= wStart && e.time <= simTime);
+  const visPoisson = poissonEvents.filter(e => e.time >= wStart && e.time <= simTime);
+  const breathe = Math.sin(phase * 2) * 0.3;
+
+  // ── Clip to simTime ──
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(pad.left, pad.top, xS(simTime) - pad.left, h - pad.top - pad.bottom);
+  ctx.clip();
+
+  // Branching arches
+  for (const ev of visHawkes) {
+    if (ev.parent >= 0 && ev.parent < events.length) {
+      const pEv = events[ev.parent];
+      const x1 = xS(pEv.time), x2 = xS(ev.time);
+      if (x1 < pad.left - 20 || x2 > w - pad.right + 20) continue;
+      const archH = Math.min(28, 8 + (x2 - x1) * 0.1);
+      const genColor = GEN_COLORS[Math.min(ev.generation, GEN_COLORS.length - 1)];
+      ctx.strokeStyle = genColor + '28'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x1, hawkesY - 4); ctx.quadraticCurveTo((x1 + x2) / 2, hawkesY - 4 - archH, x2, hawkesY - 4); ctx.stroke();
+    }
+  }
+
+  // Hawkes dots
+  for (const ev of visHawkes) {
+    const x = xS(ev.time);
+    const genColor = GEN_COLORS[Math.min(ev.generation, GEN_COLORS.length - 1)];
+    const age = simTime - ev.time; // always >= 0
+    const baseR = age < 0.5 ? 3 + (1 - age / 0.5) * 4 : 3;
+    const r = Math.max(0.5, baseR + (age > 2 ? breathe : 0));
+
+    ctx.beginPath(); safeArc(ctx, x, hawkesY, r + 3, 0, Math.PI * 2);
+    ctx.fillStyle = genColor + '12'; ctx.fill();
+
+    ctx.beginPath(); safeArc(ctx, x, hawkesY, r, 0, Math.PI * 2);
+    ctx.fillStyle = genColor; ctx.fill();
+
+    if (age < 0.8) {
+      const p = age / 0.8;
+      const flashR = Math.max(0.5, r + 14 * p);
+      ctx.beginPath(); safeArc(ctx, x, hawkesY, flashR, 0, Math.PI * 2);
+      ctx.fillStyle = genColor + Math.round((1 - p) * 40).toString(16).padStart(2, '0'); ctx.fill();
+    }
+  }
+
+  // Poisson dots
+  for (const ev of visPoisson) {
+    const x = xS(ev.time);
+    const age = simTime - ev.time; // always >= 0
+    const r = Math.max(0.5, age < 0.5 ? 2 + (1 - age / 0.5) * 2 : 2);
+    ctx.beginPath(); safeArc(ctx, x, poissonY, r, 0, Math.PI * 2);
+    ctx.fillStyle = '#5E5E78'; ctx.fill();
+  }
+
+  ctx.restore(); // remove clip
+
+  // Cursor
+  if (simTime > wStart && simTime <= wEnd) {
+    const x = xS(simTime);
+    ctx.strokeStyle = 'rgba(255,167,38,0.3)'; ctx.lineWidth = 1; ctx.setLineDash([2, 2]);
+    ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, h - pad.bottom); ctx.stroke(); ctx.setLineDash([]);
+  }
+}
+
+// ─── Update stats ────────────────────────────────────────────────
+function updateStats() {
+  const nStar = params.alpha / params.beta;
+  const reachedEvents = events.filter(e => e.time <= simTime);
+  const immigrants = reachedEvents.filter(e => e.generation === 0).length;
+  const offspring = reachedEvents.length - immigrants;
+  const curLam = computeIntensityAt(simTime);
+  const { wStart } = getWindowBounds();
+
+  let peakLam = params.mu;
+  for (const ev of reachedEvents) {
+    if (ev.time >= wStart && ev.intensityAfter > peakLam) peakLam = ev.intensityAfter;
+  }
+
+  const poissonInWindow = poissonEvents.filter(e => e.time >= wStart && e.time <= simTime).length;
+
+  document.getElementById('statTime').textContent = simTime.toFixed(1);
+  document.getElementById('statHawkes').textContent = reachedEvents.length;
+  document.getElementById('statImmigrants').textContent = immigrants;
+  document.getElementById('statOffspring').textContent = offspring;
+  document.getElementById('statLambda').textContent = curLam.toFixed(2);
+  document.getElementById('statPeak').textContent = peakLam.toFixed(2);
+  document.getElementById('statPoisson').textContent = poissonInWindow;
+
+  document.getElementById('nStarVal').textContent = nStar.toFixed(2);
+  const gaugePct = Math.min(nStar / 2, 1) * 100;
+  const gaugeFill = document.getElementById('gaugeFill');
+  gaugeFill.style.width = gaugePct + '%';
+  const badge = document.getElementById('stabilityBadge');
+  if (nStar < 0.7) {
+    gaugeFill.style.background = 'var(--mint)'; badge.textContent = 'STABLE';
+    badge.style.background = 'rgba(46,232,160,0.12)'; badge.style.color = 'var(--mint)';
+  } else if (nStar < 1.0) {
+    gaugeFill.style.background = 'var(--accent)'; badge.textContent = 'NEAR-CRITICAL';
+    badge.style.background = 'rgba(255,167,38,0.12)'; badge.style.color = 'var(--accent)';
+  } else {
+    gaugeFill.style.background = 'var(--red)'; badge.textContent = 'EXPLOSIVE';
+    badge.style.background = 'rgba(255,82,82,0.12)'; badge.style.color = 'var(--red)';
+  }
+}
+
+// ─── Animation Loop ──────────────────────────────────────────────
+function animate(timestamp) {
+  if (lastFrameTime === null) lastFrameTime = timestamp;
+  const delta = Math.min((timestamp - lastFrameTime) / 1000, 0.1); // cap delta to avoid huge jumps
+  lastFrameTime = timestamp;
+
+  animSpeed = parseFloat(document.getElementById('speedSlider').value);
+
+  // Advance simulation time only when playing
+  if (simState === 'playing') {
+    simTime += delta * animSpeed * 3;
+    advanceThinning();
+    advancePoisson();
+  }
+
+  // Ambient phase always ticks (visual effects even when paused/stopped)
+  ambientPhase += delta * 1.5;
+
+  // Always render
+  drawIntensity(ambientPhase);
+  drawTimeline(ambientPhase);
+
+  // Update stats every ~6 frames
+  statsCounter++;
+  if (statsCounter % 6 === 0) updateStats();
+
+  requestAnimationFrame(animate);
+}
+
+// ─── Parameter change handler ────────────────────────────────────
+function onParamChange() {
+  params.mu = parseFloat(document.getElementById('muSlider').value);
+  params.alpha = parseFloat(document.getElementById('alphaSlider').value);
+  params.beta = parseFloat(document.getElementById('betaSlider').value);
+  WINDOW_WIDTH = parseFloat(document.getElementById('windowSlider').value);
+
+  document.getElementById('muVal').textContent = params.mu.toFixed(2);
+  document.getElementById('alphaVal').textContent = params.alpha.toFixed(2);
+  document.getElementById('betaVal').textContent = params.beta.toFixed(2);
+  document.getElementById('windowVal').textContent = WINDOW_WIDTH.toFixed(0);
+
+  resetSim();
+  drawKernel();
+}
+
+// ─── Init ────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  ['muSlider', 'alphaSlider', 'betaSlider', 'windowSlider'].forEach(id => {
+    document.getElementById(id).addEventListener('input', onParamChange);
+  });
+
+  try {
+    katex.render('\\lambda^*(t) = \\mu + \\sum_{t_i < t} \\alpha\\, e^{-\\beta(t - t_i)}', document.getElementById('math1'), { displayMode: true, throwOnError: false });
+    katex.render('n^{*} = \\frac{\\alpha}{\\beta}', document.getElementById('math2'), { displayMode: true, throwOnError: false });
+    katex.render('\\mathbb{E}[N([0,T])] = \\frac{\\mu\\, T}{1 - n^{*}}\\,,\\quad n^{*}<1', document.getElementById('math3'), { displayMode: true, throwOnError: false });
+  } catch (e) {
+    document.getElementById('math1').textContent = '\u03BB*(t) = \u03BC + \u03A3 \u03B1 exp(-\u03B2(t-t\u1D62))';
+    document.getElementById('math2').textContent = 'n* = \u03B1/\u03B2';
+    document.getElementById('math3').textContent = 'E[N] = \u03BCT/(1-n*), n*<1';
+  }
+
+  drawKernel();
+  updateUI();
+  requestAnimationFrame(animate);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QOIF: Tensor Factorization & UMAP Intervention Analysis</title>
+    <style>
+        :root {
+            --bg: #0f172a; --surface: #1e293b; --border: #334155;
+            --text: #e2e8f0; --accent: #38bdf8; --danger: #f87171;
+        }
+        body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; position: relative; }
+        .container { max-width: 1400px; margin: 0 auto; display: grid; grid-template-columns: 400px 1fr; gap: 20px; }
+        .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+        h2 { margin-top: 0; font-size: 1.2rem; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 10px;}
+        textarea { width: 100%; height: 300px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; font-family: monospace; font-size: 12px; resize: vertical; }
+        button { width: 100%; padding: 12px; background: var(--accent); color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: 0.2s; }
+        button:hover { opacity: 0.8; }
+        button:disabled { background: var(--border); color: var(--text); cursor: not-allowed; }
+        .viz-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        canvas { width: 100%; height: 300px; background: var(--bg); border-radius: 4px; border: 1px solid var(--border); }
+        #results-box { margin-top: 15px; font-size: 13px; line-height: 1.5; color: #94a3b8; max-height: 250px; overflow-y: auto; }
+        .highlight { color: var(--danger); font-weight: bold; }
+        
+        /* Tooltip Styles */
+        #tooltip {
+            position: absolute;
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid var(--accent);
+            color: var(--text);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none; /* Crucial so mouse events pass through to canvas */
+            display: none;
+            z-index: 1000;
+            white-space: nowrap;
+            font-family: monospace;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        #tooltip strong { color: var(--accent); }
+    </style>
+</head>
+<body>
+
+<!-- Floating Tooltip Element -->
+<div id="tooltip"></div>
+
+<div class="container">
+    <!-- Left Panel: Data -->
+    <div class="panel">
+        <h2>1. Observable Data [T0..T4, ld]</h2>
+        <p style="font-size: 12px; color: #94a3b8;">Task vector counts (T) and observed Latency Deviation (ld). Hover dots on the right to inspect vectors.</p>
+        <textarea id="data-input"></textarea>
+        <button id="btn-generate" onclick="generateAndRun()">Generate Fake Data & Analyze</button>
+        <button id="btn-analyze" onclick="runAnalysis()" disabled>Re-analyze Modified Data</button>
+        
+        <div id="results-box">
+            <strong>Discovered Latent Factors (NMF Weights):</strong><br>
+            <span style="font-size: 11px;">Waiting for analysis...</span>
+        </div>
+    </div>
+
+    <!-- Right Panel: Visualizations -->
+    <div class="viz-grid">
+        <div class="panel">
+            <h2>2. Pairwise Failure (T0 vs ld)</h2>
+            <p style="font-size: 11px; color: #94a3b8;">Plotting a single task against deviation shows no clear separation.</p>
+            <canvas id="canvas-pairwise"></canvas>
+        </div>
+        <div class="panel">
+            <h2>3. UMAP of Latent Resource Space</h2>
+            <p style="font-size: 11px; color: #94a3b8;">UMAP reveals the isolated "island" of high contention.</p>
+            <canvas id="canvas-umap"></canvas>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { UMAP } from 'https://cdn.jsdelivr.net/npm/umap-js@1.3.3/+esm';
+
+    // Store drawn coordinates for hit-testing mouse hover
+    const pointsMap = new Map();
+
+    // --- 1. FAKE DATA GENERATOR ---
+    function generateData(n = 300) {
+        const data = [];
+        for (let i = 0; i < n; i++) {
+            const t0 = Math.random() > 0.6 ? Math.floor(Math.random() * 3) + 1 : 0;
+            const t1 = Math.floor(Math.random() * 4);
+            const t2 = Math.random() > 0.6 ? Math.floor(Math.random() * 2) + 1 : 0;
+            const t3 = Math.floor(Math.random() * 2);
+            const t4 = Math.random() > 0.6 ? Math.floor(Math.random() * 2) + 1 : 0;
+            
+            let ld = Math.random() * 15 + 5;
+            
+            // HIGHER-ORDER INTERACTION TRAP
+            if (t0 > 0 && t2 > 0 && t4 > 0) {
+                ld += 60 + (Math.random() * 40); 
+            }
+            
+            data.push({ t0, t1, t2, t3, t4, ld: Math.round(ld * 10) / 10 });
+        }
+        return data;
+    }
+
+    // --- 2. TENSOR FACTORIZATION PROXY (NMF) ---
+    function buildInteractionMatrix(data) {
+        const matrix = [];
+        data.forEach(d => {
+            const { t0, t1, t2, t3, t4 } = d;
+            matrix.push([t0, t1, t2, t3, t4, t0 * t2, t0 * t4, t2 * t4, t0 * t2 * t4]);
+        });
+        return matrix;
+    }
+
+    function runNMF(V, k, iterations = 100) {
+        const n = V.length;     
+        const m = V[0].length;  
+        let W = Array.from({length: n}, () => Array.from({length: k}, () => Math.random() * 0.1 + 0.01));
+        let H = Array.from({length: k}, () => Array.from({length: m}, () => Math.random() * 0.1 + 0.01));
+        const eps = 1e-6;
+
+        for (let iter = 0; iter < iterations; iter++) {
+            for (let i = 0; i < k; i++) {
+                for (let j = 0; j < m; j++) {
+                    let num = 0, den = 0;
+                    for (let l = 0; l < n; l++) {
+                        let wth = 0;
+                        for (let p = 0; p < k; p++) wth += W[l][p] * H[p][j];
+                        num += W[l][i] * V[l][j];
+                        den += W[l][i] * wth;
+                    }
+                    H[i][j] *= (num / (den + eps));
+                }
+            }
+            for (let l = 0; l < n; l++) {
+                for (let i = 0; i < k; i++) {
+                    let num = 0, den = 0;
+                    for (let j = 0; j < m; j++) {
+                        let wht = 0;
+                        for (let p = 0; p < k; p++) wht += W[l][p] * H[p][j];
+                        num += V[l][j] * H[i][j];
+                        den += wht * H[i][j];
+                    }
+                    W[l][i] *= (num / (den + eps));
+                }
+            }
+        }
+        return { W, H };
+    }
+
+    // --- 3. VISUALIZATION ---
+    function drawScatter(canvasId, xData, yData, colors, xLabel, yLabel, rawData) {
+        const canvas = document.getElementById(canvasId);
+        const ctx = canvas.getContext('2d');
+        canvas.width = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const padding = 30;
+        const w = canvas.width - padding * 2;
+        const h = canvas.height - padding * 2;
+
+        // Add buffer so points don't sit directly on axes
+        const xMin = Math.min(...xData) - 0.5, xMax = Math.max(...xData) + 0.5;
+        const yMin = Math.min(...yData) - 5, yMax = Math.max(...yData) + 5;
+
+        const getX = v => padding + ((v - xMin) / (xMax - xMin)) * w;
+        const getY = v => padding + h - ((v - yMin) / (yMax - yMin)) * h;
+
+        ctx.strokeStyle = '#475569'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(padding, padding); ctx.lineTo(padding, padding + h); ctx.lineTo(padding + w, padding + h); ctx.stroke();
+        
+        ctx.fillStyle = '#94a3b8'; ctx.font = '10px system-ui';
+        ctx.fillText(xLabel, padding + w/2 - 20, padding + h + 20);
+        ctx.save(); ctx.translate(10, padding + h/2); ctx.rotate(-Math.PI/2); ctx.fillText(yLabel, 0, 0); ctx.restore();
+
+        const currentPoints = [];
+
+        xData.forEach((x, i) => {
+            const y = yData[i];
+            const c = colors[i]; 
+            const cx = getX(x);
+            const cy = getY(y);
+            
+            ctx.beginPath();
+            ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${c.r}, ${c.g}, ${c.b}, 0.8)`;
+            ctx.fill();
+
+            // Store pixel coordinates and metadata for hover detection
+            if (rawData && rawData[i]) {
+                const d = rawData[i];
+                currentPoints.push({
+                    x: cx,
+                    y: cy,
+                    html: `<strong>Latency Dev:</strong> ${d.ld}ms<br>` +
+                          `<strong>Task Vector:</strong><br>` +
+                          `[${d.t0}, ${d.t1}, ${d.t2}, ${d.t3}, ${d.t4}]`
+                });
+            }
+        });
+
+        // Update map for mousemove event listener
+        pointsMap.set(canvasId, currentPoints);
+    }
+
+    function getColor(ld) {
+        const maxLd = 100; 
+        const t = Math.min(ld / maxLd, 1);
+        return {
+            r: Math.round(255 * t),
+            g: Math.round(50 * (1 - t)),
+            b: Math.round(255 * (1 - t))
+        };
+    }
+
+    // --- HOVER TOOLTIP LOGIC ---
+    function handleMouseMove(e, canvasId) {
+        const rect = e.target.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        const tooltip = document.getElementById('tooltip');
+        const points = pointsMap.get(canvasId) || [];
+        
+        let found = false;
+        // Check if mouse is within 8 pixels of any point center
+        for (const p of points) {
+            const dist = Math.hypot(p.x - mx, p.y - my);
+            if (dist < 8) {
+                tooltip.style.display = 'block';
+                // Position tooltip slightly offset from cursor
+                tooltip.style.left = (e.pageX + 15) + 'px';
+                tooltip.style.top = (e.pageY - 10) + 'px';
+                tooltip.innerHTML = p.html;
+                found = true;
+                e.target.style.cursor = 'crosshair';
+                break;
+            }
+        }
+        if (!found) {
+            tooltip.style.display = 'none';
+            e.target.style.cursor = 'default';
+        }
+    }
+
+    // Attach listeners to canvases
+    const canvasPairwise = document.getElementById('canvas-pairwise');
+    const canvasUmap = document.getElementById('canvas-umap');
+
+    canvasPairwise.addEventListener('mousemove', (e) => handleMouseMove(e, 'canvas-pairwise'));
+    canvasUmap.addEventListener('mousemove', (e) => handleMouseMove(e, 'canvas-umap'));
+
+    // Hide tooltip when mouse leaves canvas area
+    [canvasPairwise, canvasUmap].forEach(c => {
+        c.addEventListener('mouseleave', () => {
+            document.getElementById('tooltip').style.display = 'none';
+            c.style.cursor = 'default';
+        });
+    });
+
+
+    // --- MAIN PIPELINE ---
+    async function runAnalysis() {
+        const btnAnalyze = document.getElementById('btn-analyze');
+        btnAnalyze.disabled = true;
+        btnAnalyze.innerText = "Calculating Tensor Factors & UMAP...";
+
+        let data;
+        try {
+            data = JSON.parse(document.getElementById('data-input').value);
+        } catch(e) {
+            alert("Invalid JSON format in textarea."); btnAnalyze.disabled = false; return;
+        }
+
+        const lds = data.map(d => d.ld);
+        const colors = lds.map(getColor);
+
+        // Pass raw 'data' as last argument to enable tooltips
+        drawScatter('canvas-pairwise', data.map(d => d.t0), lds, colors, "Task 0 Count", "Latency Deviation (ld)", data);
+
+        const V = buildInteractionMatrix(data);
+        const { W, H } = runNMF(V, 2); 
+        
+        const umap = new UMAP({ nNeighbors: 15, minDist: 0.1, nComponents: 2 });
+        const embedding = umap.fit(W);
+
+        // Pass raw 'data' as last argument to enable tooltips
+        drawScatter('canvas-umap', embedding.map(e => e[0]), embedding.map(e => e[1]), colors, "UMAP Latent Dim 1", "UMAP Latent Dim 2", data);
+
+        const featureNames = ['T0', 'T1', 'T2', 'T3', 'T4', 'T0xT2', 'T0xT4', 'T2xT4', 'T0xT2xT4'];
+        let resultsHtml = "<strong style='color:#e2e8f0'>Discovered Latent Resource Couplings (H Matrix):</strong><br><br>";
+        
+        H.forEach((factor, idx) => {
+            resultsHtml += `<span style="color:var(--accent)">Latent Resource ${idx + 1} Basis:</span><br>`;
+            let scoredFeatures = factor.map((w, i) => ({ name: featureNames[i], weight: w })).sort((a,b) => b.weight - a.weight);
+            scoredFeatures.slice(0, 4).forEach(f => {
+                if(f.weight > 0.01) {
+                    const isCulprit = f.name === 'T0xT2xT4' && f.weight > 0.5;
+                    resultsHtml += `&nbsp;&nbsp;- ${f.name}: <span class="${isCulprit ? 'highlight' : ''}">${f.weight.toFixed(3)}</span><br>`;
+                }
+            });
+            resultsHtml += "<br>";
+        });
+
+        resultsHtml += "<em style='font-size:11px'>Hover over the red dots in the UMAP graph to verify they all share [T0>0, T2>0, T4>0].</em>";
+        document.getElementById('results-box').innerHTML = resultsHtml;
+
+        btnAnalyze.disabled = false;
+        btnAnalyze.innerText = "Re-analyze Modified Data";
+    }
+
+    function generateAndRun() {
+        const data = generateData(300);
+        document.getElementById('data-input').value = JSON.stringify(data, null, 2);
+        runAnalysis();
+    }
+
+    window.generateAndRun = generateAndRun;
+    window.runAnalysis = runAnalysis;
+    window.onload = generateAndRun;
+
+</script>
+</body>
+</html>

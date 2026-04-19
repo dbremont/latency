@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QOIF: Autoencoder Latent Analysis</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #050811;
+            --bg-main: #0a0f1e;
+            --bg-panel: #0f1629;
+            --bg-input: #080c18;
+            --border-subtle: #1e293b;
+            --border-hover: #334155;
+            --text-main: #f1f5f9;
+            --text-muted: #64748b;
+            --accent-blue: #3b82f6;
+            --accent-cyan: #22d3ee;
+            --danger-red: #ef4444;
+            --danger-glow: rgba(239, 68, 68, 0.4);
+        }
+
+        * { box-sizing: border-box; }
+
+        body { 
+            font-family: 'Inter', system-ui, sans-serif; 
+            background: var(--bg-main); 
+            color: var(--text-main); 
+            margin: 0; 
+            padding: 24px; 
+            min-height: 100vh;
+            background-image: radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.08) 0%, transparent 50%);
+        }
+
+        .container { 
+            max-width: 1440px; 
+            margin: 0 auto; 
+            display: grid; 
+            grid-template-columns: 380px 1fr; 
+            gap: 24px; 
+        }
+
+        .panel { 
+            background: var(--bg-panel); 
+            border: 1px solid var(--border-subtle); 
+            border-radius: 12px; 
+            padding: 24px; 
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: border-color 0.3s ease;
+        }
+
+        .panel:hover {
+            border-color: var(--border-hover);
+        }
+
+        h2 { 
+            margin: 0 0 16px 0; 
+            font-size: 0.875rem; 
+            font-weight: 600; 
+            color: var(--text-main); 
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        h2::before {
+            content: '';
+            display: block;
+            width: 3px;
+            height: 14px;
+            background: var(--accent-blue);
+            border-radius: 2px;
+        }
+
+        .subtitle { 
+            font-size: 0.8125rem; 
+            color: var(--text-muted); 
+            margin: -8px 0 16px 0; 
+            line-height: 1.5; 
+        }
+
+        textarea { 
+            width: 100%; 
+            height: 220px; 
+            background: var(--bg-input); 
+            color: var(--accent-cyan); 
+            border: 1px solid var(--border-subtle); 
+            border-radius: 8px; 
+            font-family: 'JetBrains Mono', monospace; 
+            font-size: 11px; 
+            resize: vertical; 
+            padding: 12px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-subtle) var(--bg-input);
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+
+        .btn-group { display: flex; gap: 10px; margin-top: 16px; }
+
+        button { 
+            flex: 1;
+            padding: 10px 16px; 
+            background: var(--accent-blue); 
+            color: #fff; 
+            border: none; 
+            border-radius: 8px; 
+            font-weight: 600; 
+            font-size: 0.8125rem;
+            cursor: pointer; 
+            transition: all 0.2s; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        button:hover { 
+            background: #2563eb; 
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        button:disabled { 
+            background: var(--border-subtle); 
+            color: var(--text-muted); 
+            cursor: not-allowed; 
+            transform: none;
+            box-shadow: none;
+        }
+
+        button.secondary {
+            background: transparent;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            box-shadow: none;
+        }
+
+        button.secondary:hover {
+            background: rgba(255,255,255,0.05);
+            border-color: var(--text-muted);
+        }
+
+        .viz-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-content: start; }
+        
+        canvas { 
+            width: 100%; 
+            height: 320px; 
+            background: var(--bg-input); 
+            border-radius: 8px; 
+            border: 1px solid var(--border-subtle); 
+        }
+
+        #results-box { 
+            margin-top: 20px; 
+            border-top: 1px solid var(--border-subtle);
+            padding-top: 16px;
+        }
+
+        .result-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+        }
+
+        .feature-bar-container {
+            margin-bottom: 10px;
+        }
+
+        .feature-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8125rem;
+            margin-bottom: 4px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .feature-name { color: var(--text-main); }
+        .feature-value { color: var(--text-muted); font-size: 0.75rem; }
+        .feature-track {
+            width: 100%;
+            height: 6px;
+            background: var(--bg-deep);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .feature-fill {
+            height: 100%;
+            background: var(--accent-blue);
+            border-radius: 3px;
+            transition: width 0.5s ease-out;
+            box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+        }
+
+        .feature-fill.danger {
+            background: var(--danger-red);
+            box-shadow: 0 0 8px var(--danger-glow);
+        }
+
+        #tooltip {
+            position: absolute;
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border-hover);
+            color: var(--text-main);
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 12px;
+            pointer-events: none; 
+            display: none;
+            z-index: 1000;
+            font-family: 'JetBrains Mono', monospace;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.4);
+        }
+
+        #tooltip strong { color: var(--accent-cyan); }
+        #tooltip .danger-text { color: var(--danger-red); }
+        
+        @keyframes spin { 0% { transform: rotate(0deg) } 100% { transform: rotate(360deg) } }
+        .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; animation: spin 0.8s linear infinite; margin-right: 8px; vertical-align: middle; }
+    </style>
+</head>
+<body>
+
+<div id="tooltip"></div>
+
+<div class="container">
+    <!-- Left Panel: Data -->
+    <div class="panel">
+        <h2>Observable Stream</h2>
+        <p class="subtitle">Event stream containing task type (tau), start time (t), and duration (d). Hover dots on graphs to inspect concurrent vectors.</p>
+        <textarea id="data-input" spellcheck="false"></textarea>
+        <div class="btn-group">
+            <button id="btn-generate" onclick="generateAndRun()">Generate Stream</button>
+            <button id="btn-analyze" class="secondary" onclick="runAnalysis()" disabled>Analyze</button>
+        </div>
+        
+        <div id="results-box">
+            <div class="result-title">Encoder Feature Importance</div>
+            <div id="feature-bars">
+                <span style="font-size: 12px; color: var(--text-muted);">Waiting for analysis...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Panel: Visualizations -->
+    <div class="viz-grid">
+        <div class="panel">
+            <h2>Concurrent T0 vs Anomaly</h2>
+            <p class="subtitle">Single task concurrency shows limited separation between normal and anomalous states.</p>
+            <canvas id="canvas-pairwise"></canvas>
+        </div>
+        <div class="panel">
+            <h2>Autoencoder Latent Space</h2>
+            <p class="subtitle">Bottleneck layer isolates the high-contention state islands.</p>
+            <canvas id="canvas-umap"></canvas>
+        </div>
+    </div>
+</div>
+
+<script>
+    const pointsMap = new Map();
+    const API_URL = 'http://localhost:8000/analyze';
+
+    // --- 1. FAKE DATA GENERATOR ---
+    function generateData(n = 300) {
+        const data = [];
+        let currentTime = 0;
+        for (let i = 0; i < n; i++) {
+            currentTime += Math.random() * 30; 
+            const tau = Math.floor(Math.random() * 5); 
+            let d = 10 + Math.random() * 30; 
+            
+            if (Math.random() > 0.85) {
+                data.push({ tau: 0, t: currentTime, d: 80 + Math.random() * 50 });
+                data.push({ tau: 2, t: currentTime + 0.5, d: 80 + Math.random() * 50 });
+                data.push({ tau: 4, t: currentTime + 1.0, d: 80 + Math.random() * 50 });
+                currentTime += 5; 
+            } else {
+                data.push({ tau, t: currentTime, d });
+            }
+        }
+        return data;
+    }
+
+    // --- 2. VISUALIZATION ---
+    function drawScatter(canvasId, xData, yData, colors, xLabel, yLabel, rawData) {
+        const canvas = document.getElementById(canvasId);
+        const ctx = canvas.getContext('2d');
+        
+        // Retina support
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        ctx.scale(dpr, dpr);
+        
+        const width = rect.width;
+        const height = rect.height;
+        ctx.clearRect(0, 0, width, height);
+
+        const padding = { top: 20, right: 20, bottom: 40, left: 50 };
+        const w = width - padding.left - padding.right;
+        const h = height - padding.top - padding.bottom;
+
+        const xMin = Math.min(...xData) - 0.5, xMax = Math.max(...xData) + 0.5;
+        const yMin = Math.min(...yData) - 0.5, yMax = Math.max(...yData) + 0.5;
+
+        const getX = v => padding.left + ((v - xMin) / (xMax - xMin)) * w;
+        const getY = v => padding.top + h - ((v - yMin) / (yMax - yMin)) * h;
+
+        // Grid & Axes
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = 1;
+        
+        // Y axis grid
+        const yTicks = 5;
+        ctx.fillStyle = '#64748b'; 
+        ctx.font = '10px Inter, system-ui';
+        ctx.textAlign = 'right';
+        for(let i=0; i<=yTicks; i++) {
+            const val = yMin + (yMax - yMin) * (i/yTicks);
+            const y = getY(val);
+            ctx.beginPath(); ctx.moveTo(padding.left, y); ctx.lineTo(padding.left + w, y); ctx.stroke();
+            ctx.fillText(val.toFixed(1), padding.left - 8, y + 3);
+        }
+
+        // X axis grid
+        const xTicks = 4;
+        ctx.textAlign = 'center';
+        for(let i=0; i<=xTicks; i++) {
+            const val = xMin + (xMax - xMin) * (i/xTicks);
+            const x = getX(val);
+            ctx.beginPath(); ctx.moveTo(x, padding.top); ctx.lineTo(x, padding.top + h); ctx.stroke();
+            ctx.fillText(val.toFixed(1), x, padding.top + h + 16);
+        }
+
+        // Axis Labels
+        ctx.fillStyle = '#94a3b8'; 
+        ctx.font = '500 11px Inter, system-ui';
+        ctx.fillText(xLabel, padding.left + w/2, height - 5);
+        ctx.save(); 
+        ctx.translate(14, padding.top + h/2); 
+        ctx.rotate(-Math.PI/2); 
+        ctx.fillText(yLabel, 0, 0); 
+        ctx.restore();
+
+        const currentPoints = [];
+
+        // Draw Points (Normal first, Anomalous on top)
+        const indices = Array.from(Array(xData.length).keys()).sort((a, b) => colors[a].r - colors[b].r);
+
+        indices.forEach(i => {
+            const x = xData[i];
+            const y = yData[i];
+            const c = colors[i]; 
+            const cx = getX(x);
+            const cy = getY(y);
+            
+            ctx.beginPath();
+            ctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
+            
+            // Glow effect for anomalies (red dots)
+            if (c.r > 150) {
+                ctx.shadowColor = 'rgba(239, 68, 68, 0.6)';
+                ctx.shadowBlur = 10;
+                ctx.fillStyle = `rgba(${c.r}, ${c.g}, ${c.b}, 0.9)`;
+            } else {
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = `rgba(${c.r}, ${c.g}, ${c.b}, 0.6)`;
+            }
+            ctx.fill();
+
+            if (rawData && rawData[i]) {
+                const d = rawData[i];
+                currentPoints.push({
+                    x: cx, y: cy,
+                    html: `<strong>Recon Error:</strong> <span class="${d.recon_error > 0.5 ? 'danger-text' : ''}">${d.recon_error.toFixed(4)}</span><br>` +
+                          `<strong>Concurrent Vector:</strong><br>` +
+                          `[${d.vec.map(v => v.toFixed(0)).join(', ')}]`
+                });
+            }
+        });
+
+        // Reset shadow
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+
+        pointsMap.set(canvasId, currentPoints);
+    }
+
+    function getColor(err, maxErr) {
+        const t = Math.min(err / (maxErr * 0.6), 1); 
+        return {
+            r: Math.round(59 + 196 * t),   // 59 (blue) -> 255 (red)
+            g: Math.round(130 - 100 * t),   // 130 -> 30
+            b: Math.round(246 - 210 * t)    // 246 -> 36
+        };
+    }
+
+    // --- HOVER TOOLTIP LOGIC ---
+    function handleMouseMove(e, canvasId) {
+        const rect = e.target.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        const tooltip = document.getElementById('tooltip');
+        const points = pointsMap.get(canvasId) || [];
+        
+        let found = false;
+        for (const p of points) {
+            const dist = Math.hypot(p.x - mx, p.y - my);
+            if (dist < 10) { // Slightly larger hitbox
+                tooltip.style.display = 'block';
+                tooltip.style.left = (e.pageX + 15) + 'px';
+                tooltip.style.top = (e.pageY - 10) + 'px';
+                tooltip.innerHTML = p.html;
+                found = true;
+                e.target.style.cursor = 'crosshair';
+                break;
+            }
+        }
+        if (!found) {
+            tooltip.style.display = 'none';
+            e.target.style.cursor = 'default';
+        }
+    }
+
+    const canvasPairwise = document.getElementById('canvas-pairwise');
+    const canvasUmap = document.getElementById('canvas-umap');
+
+    canvasPairwise.addEventListener('mousemove', (e) => handleMouseMove(e, 'canvas-pairwise'));
+    canvasUmap.addEventListener('mousemove', (e) => handleMouseMove(e, 'canvas-umap'));
+
+    [canvasPairwise, canvasUmap].forEach(c => {
+        c.addEventListener('mouseleave', () => {
+            document.getElementById('tooltip').style.display = 'none';
+            c.style.cursor = 'default';
+        });
+    });
+
+    // --- UI UPDATES ---
+    function renderFeatureImportance(feature_names, feature_importance) {
+        const container = document.getElementById('feature-bars');
+        let maxWeight = Math.max(...feature_importance, 0.01);
+        
+        // Sort by weight descending
+        let sorted = feature_names.map((name, i) => ({name, weight: feature_importance[i]}))
+                                  .sort((a, b) => b.weight - a.weight);
+        
+        let html = '';
+        sorted.forEach(f => {
+            if (f.weight > 0.005) {
+                const pct = (f.weight / maxWeight) * 100;
+                const isDanger = f.name === 'T0' || f.name === 'T2' || f.name === 'T4'; // Simple highlight logic
+                html += `
+                    <div class="feature-bar-container">
+                        <div class="feature-label">
+                            <span class="feature-name">${f.name}</span>
+                            <span class="feature-value">${f.weight.toFixed(4)}</span>
+                        </div>
+                        <div class="feature-track">
+                            <div class="feature-fill ${isDanger && pct > 40 ? 'danger' : ''}" style="width: ${pct}%;"></div>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+        container.innerHTML = html;
+
+        // Trigger animation
+        setTimeout(() => {
+            document.querySelectorAll('.feature-fill').forEach(el => {
+                el.style.width = el.style.width; // Force reflow trick isn't needed, just ensure transition applies
+            });
+        }, 50);
+    }
+
+    // --- MAIN PIPELINE ---
+    async function runAnalysis() {
+        const btnAnalyze = document.getElementById('btn-analyze');
+        const btnGenerate = document.getElementById('btn-generate');
+        
+        btnAnalyze.disabled = true;
+        btnGenerate.disabled = true;
+        btnAnalyze.innerHTML = `<span class="spinner"></span> Encoding...`;
+
+        let data;
+        try {
+            data = JSON.parse(document.getElementById('data-input').value);
+        } catch(e) {
+            alert("Invalid JSON format in textarea."); 
+            btnAnalyze.disabled = false; 
+            btnGenerate.disabled = false;
+            btnAnalyze.innerText = "Analyze";
+            return;
+        }
+
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (!response.ok) throw new Error(`API Error: ${response.status}`);
+
+            const result = await response.json();
+
+            if (result.error) {
+                alert("API Error: " + result.error);
+                return;
+            }
+
+            const { latent_coords, reconstruction_errors, feature_importance, feature_names, analyzed_data } = result;
+
+            const maxErr = Math.max(...reconstruction_errors, 0.1);
+            const colors = reconstruction_errors.map(err => getColor(err, maxErr));
+
+            const t0Counts = analyzed_data.map(d => d.vec[0]);
+            drawScatter('canvas-pairwise', t0Counts, reconstruction_errors, colors, "Concurrent T0 Count", "Reconstruction Error", analyzed_data);
+
+            drawScatter('canvas-umap', latent_coords.map(c => c[0]), latent_coords.map(c => c[1]), colors, "Latent Dim 1", "Latent Dim 2", analyzed_data);
+
+            renderFeatureImportance(feature_names, feature_importance);
+
+        } catch (error) {
+            console.error("Analysis failed:", error);
+            alert("Failed to connect to the API. Ensure it is running on " + API_URL);
+        } finally {
+            btnAnalyze.disabled = false;
+            btnGenerate.disabled = false;
+            btnAnalyze.innerText = "Analyze";
+        }
+    }
+
+    function generateAndRun() {
+        const data = generateData(300);
+        document.getElementById('data-input').value = JSON.stringify(data, null, 2);
+        runAnalysis();
+    }
+
+    window.generateAndRun = generateAndRun;
+    window.runAnalysis = runAnalysis;
+    window.onload = generateAndRun;
+
+</script>
+</body>
+</html>

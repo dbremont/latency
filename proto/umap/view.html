@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QOIF: Strict Observational Model Pipeline</title>
+    <style>
+        :root { --bg: #0f172a; --surface: #1e293b; --border: #334155; --text: #e2e8f0; --accent: #38bdf8; --danger: #f87171; --success: #4ade80; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 20px; position: relative; }
+        .grid { display: grid; grid-template-columns: 350px 1fr 1fr; gap: 20px; max-width: 1600px; margin: 0 auto; }
+        .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; }
+        h1 { text-align: center; color: var(--accent); margin-bottom: 5px; }
+        .sub { text-align: center; color: #64748b; margin-bottom: 25px; font-size: 14px; }
+        h2 { font-size: 1rem; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 12px; }
+        textarea { flex-grow: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; font-family: monospace; font-size: 11px; padding: 10px; resize: none; min-height: 250px;}
+        button { width: 100%; padding: 12px; background: var(--accent); color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        button:disabled { background: var(--border); color: var(--text); cursor: not-allowed; }
+        .viz-area { display: flex; flex-direction: column; gap: 20px; }
+        canvas { width: 100%; height: 320px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; }
+        .rules-box { background: var(--bg); border: 1px solid var(--danger); border-radius: 4px; padding: 15px; font-family: monospace; font-size: 12px; color: var(--success); max-height: 300px; overflow-y: auto; white-space: pre-wrap; margin-top: 10px; }
+        #tooltip { position: absolute; background: rgba(15, 23, 42, 0.95); border: 1px solid var(--accent); color: var(--text); padding: 8px 12px; border-radius: 4px; font-size: 11px; pointer-events: none; display: none; z-index: 1000; white-space: nowrap; font-family: monospace; box-shadow: 0 4px 6px rgba(0,0,0,0.5); }
+        #tooltip strong { color: var(--accent); }
+        .error { border: 1px solid var(--danger); color: var(--danger); padding: 10px; margin-top: 10px; background: rgba(248, 113, 113, 0.1); border-radius: 4px; display: none; font-size: 12px;}
+    </style>
+</head>
+<body>
+
+<div id="tooltip"></div>
+<h1>QOIF: Blind Stream Analysis</h1>
+<p class="sub">Input: Raw [τ, t, d] stream → Python Interval Overlap Extraction → XGBoost N-Way Discovery</p>
+
+<div class="grid">
+    <div class="panel">
+        <h2>1. Raw Observable Event Stream</h2>
+        <p style="font-size: 11px; color: #94a3b8; margin-bottom: 10px;">Format: {"tau": type, "t": start_time, "d": duration}. No IDs. Contains hidden 3, 4, and 6-way cascading interaction patterns.</p>
+        <textarea id="data-input"></textarea>
+        <div class="error" id="error-msg">Ensure Python backend is running on port 8000</div>
+        <button id="btn-gen" onclick="generateAndRun()">Generate Stream & Send to Python</button>
+        <button id="btn-run" onclick="runPipeline()" disabled>Send Modified Stream to Python</button>
+    </div>
+
+    <div class="panel viz-area">
+        <h2>4. Topology: UMAP of Tree Hidden Layer</h2>
+        <p style="font-size:11px; color:#94a3b8;">Islands represent distinct N-way interaction regimes discovered implicitly from timestamps.</p>
+        <canvas id="canvas-umap"></canvas>
+        <h2>5. Intervention: Extracted N-Way Rules</h2>
+        <div class="rules-box" id="rules-output">Waiting for Python XGBoost extraction...</div>
+    </div>
+
+    <div class="panel viz-area">
+        <h2>3. Discovery Engine: XGBoost Weights</h2>
+        <p style="font-size:11px; color:#94a3b8;">Weights of reconstructed concurrent tasks.</p>
+        <canvas id="canvas-importance"></canvas>
+        <p style="font-size:11px; color:#94a3b8; margin-top:15px;">Extracted Tree Paths</p>
+        <div class="rules-box" id="paths-output" style="border-color: var(--accent); color: var(--text);">Waiting for Python parsing...</div>
+    </div>
+</div>
+
+<script>
+const tooltip = document.getElementById('tooltip');
+const pointsMap = new Map();
+const API_URL = 'http://localhost:8000/analyze';
+
+// --- 0. REALISTIC PATTERN DATA GENERATOR ---
+function generateStream(n = 1000) {
+    const stream = [];
+    let time = 0;
+    
+    // Define the hidden interaction rules (Cascading patterns)
+    // When 'trigger' fires, it spawns 'followers' with slight delays.
+    const interactionPatterns = [
+        { trigger: 1, followers: [3, 5], delay_range: [2, 8], base_duration: 35, penalty: 45 },    // 3-way trap
+        { trigger: 2, followers: [4, 6, 8], delay_range: [1, 5], base_duration: 40, penalty: 90 },  // 4-way trap
+        { trigger: 0, followers: [1, 2, 3, 4, 5], delay_range: [0, 10], base_duration: 50, penalty: 160 } // 6-way trap
+    ];
+
+    while (stream.length < n) {
+        // 5% chance to trigger an interaction cascade
+        const isTrigger = Math.random() < 0.05; 
+
+        if (isTrigger) {
+            // Pick a random pattern to inject
+            const pattern = interactionPatterns[Math.floor(Math.random() * interactionPatterns.length)];
+            const triggerStart = time;
+            const triggerDur = pattern.base_duration + Math.random() * 20;
+
+            // 1. Inject the trigger task
+            stream.push({ 
+                tau: pattern.trigger, 
+                t: Math.round(triggerStart * 100) / 100, 
+                d: Math.round((triggerDur + pattern.penalty) * 100) / 100 
+            });
+
+            // 2. Inject the follower tasks with staggered starts
+            pattern.followers.forEach(fTau => {
+                const delay = pattern.delay_range[0] + Math.random() * (pattern.delay_range[1] - pattern.delay_range[0]);
+                const fStart = triggerStart + delay;
+                // Ensure duration is long enough to physically overlap with the trigger
+                const fDur = pattern.base_duration + Math.random() * 20; 
+                
+                stream.push({ 
+                    tau: fTau, 
+                    t: Math.round(fStart * 100) / 100, 
+                    d: Math.round((fDur + pattern.penalty) * 100) / 100 
+                });
+            });
+
+            // Advance time past this interaction window
+            time = triggerStart + pattern.base_duration + 20;
+        } else {
+            // Normal background system noise
+            const tau = Math.floor(Math.random() * 10); // 10 task types (0-9)
+            const t = time + Math.random() * 5;
+            const d = 10 + Math.random() * 10; // Baseline 10-20ms
+            
+            stream.push({ 
+                tau: tau, 
+                t: Math.round(t * 100) / 100, 
+                d: Math.round(d * 100) / 100 
+            });
+            time = t;
+        }
+    }
+
+    // Sort strictly by start time as it would arrive from system logs
+    return stream.sort((a, b) => a.t - b.t); 
+}
+
+// --- 2. VISUALIZATION ---
+function getColor(ld) {
+    const t = Math.min(ld / 100, 1); 
+    return { r: Math.round(255 * t), g: Math.round(50 * (1 - t)), b: Math.round(255 * (1 - t)) };
+}
+
+function drawUmap(canvasId, embedding, analyzedData) {
+    const canvas = document.getElementById(canvasId);
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
+    ctx.clearRect(0,0,canvas.width, canvas.height);
+    const pad = 30, w = canvas.width-pad*2, h = canvas.height-pad*2;
+    const xD = embedding.map(e=>e[0]), yD = embedding.map(e=>e[1]);
+    const xMin=Math.min(...xD)-1, xMax=Math.max(...xD)+1, yMin=Math.min(...yD)-1, yMax=Math.max(...yD)+1;
+    const getX = v => pad + ((v-xMin)/(xMax-xMin))*w;
+    const getY = v => pad + h - ((v-yMin)/(yMax-yMin))*h;
+    
+    ctx.strokeStyle='#334155'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(pad,pad); ctx.lineTo(pad,pad+h); ctx.lineTo(pad+w,pad+h); ctx.stroke();
+    
+    const pts = [];
+    xD.forEach((x,i) => {
+        const cx = getX(x), cy = getY(yD[i]), c = getColor(analyzedData[i].ld);
+        ctx.beginPath(); ctx.arc(cx,cy,4,0,Math.PI*2); ctx.fillStyle=`rgba(${c.r},${c.g},${c.b},0.8)`; ctx.fill();
+        const d = analyzedData[i];
+        pts.push({x:cx, y:cy, html: `<strong>Δd (Deviation):</strong> ${d.ld}ms<br><strong>Concurrent State Vec:</strong> [${d.vec.join(', ')}]`});
+    });
+    pointsMap.set(canvasId, pts);
+}
+
+function drawImportance(canvasId, importance) {
+    const canvas = document.getElementById(canvasId);
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
+    ctx.clearRect(0,0,canvas.width, canvas.height);
+    const maxImp = Math.max(...importance);
+    const barW = 30, gap = 15, startX = 40, startY = canvas.height - 40, maxH = canvas.height - 80;
+    importance.forEach((val, i) => {
+        const h = maxImp === 0 ? 0 : (val / maxImp) * maxH;
+        const x = startX + i * (barW + gap);
+        ctx.fillStyle = val === maxImp ? '#f87171' : '#38bdf8';
+        ctx.fillRect(x, startY - h, barW, h);
+        ctx.fillStyle = '#94a3b8'; ctx.font = '12px monospace'; ctx.textAlign = 'center';
+        ctx.fillText(`T${i}`, x + barW/2, startY + 15);
+    });
+    ctx.fillStyle = '#64748b'; ctx.font = '10px system-ui'; ctx.textAlign = 'left';
+    ctx.fillText('XGBoost Concurrent Task Weights', startX, 20);
+}
+
+// --- HOVER LOGIC ---
+function handleHover(e, id) {
+    const rect = e.target.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const pts = pointsMap.get(id) || [];
+    let found = false;
+    for (const p of pts) {
+        if (Math.hypot(p.x-mx, p.y-my) < 8) {
+            tooltip.style.display = 'block'; tooltip.style.left = (e.pageX+15)+'px'; tooltip.style.top = (e.pageY-10)+'px';
+            tooltip.innerHTML = p.html; found = true; e.target.style.cursor = 'crosshair'; break;
+        }
+    }
+    if(!found) { tooltip.style.display='none'; e.target.style.cursor='default'; }
+}
+document.getElementById('canvas-umap').addEventListener('mousemove', e => handleHover(e, 'canvas-umap'));
+document.getElementById('canvas-umap').addEventListener('mouseleave', () => { tooltip.style.display='none'; });
+
+
+// --- MAIN PIPELINE (NETWORK CALL) ---
+async function runPipeline() {
+    const btn = document.getElementById('btn-run'); const btnGen = document.getElementById('btn-gen');
+    const errBox = document.getElementById('error-msg');
+    btn.disabled = true; btnGen.disabled = true; btn.innerText = "Sending Stream to Python...";
+    errBox.style.display = 'none';
+
+    let data;
+    try { data = JSON.parse(document.getElementById('data-input').value); } catch(e) { alert("Invalid JSON format."); btn.disabled=false; btnGen.disabled=false; return; }
+
+    try {
+        const response = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+        if (!response.ok) throw new Error(`Python Server Error: ${response.statusText}`);
+        const res = await response.json();
+
+        drawUmap('canvas-umap', res.umap_coords, res.analyzed_data);
+        drawImportance('canvas-importance', res.importance);
+        
+        document.getElementById('paths-output').innerText = res.rules.map(p => `IF ${p.path}\n  --> IMPACT: +${p.impact}ms`).join('\n\n---\n\n') || "No significant interaction paths found.";
+        document.getElementById('rules-output').innerText = "!! INTERVENTION ENGINE !!\n\n" + res.rules.map(r => `IF (${r.path})\n   --> BLOCK/THROTTLE (+${r.impact}ms avoided)`).join('\n\n');
+
+    } catch (err) {
+        console.error(err);
+        errBox.innerText = `Connection/Processing Failed: ${err.message}`;
+        errBox.style.display = 'block';
+    }
+    btn.disabled = false; btnGen.disabled = false; btn.innerText = "Re-send Modified Stream to Python";
+}
+
+function generateAndRun() {
+    const data = generateStream(1000);
+    document.getElementById('data-input').value = JSON.stringify(data, null, 2);
+    runPipeline();
+}
+</script>
+</body>
+</html>
